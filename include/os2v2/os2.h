@@ -1,0 +1,26 @@
+/*
+ * os2.h - the 32-bit OS/2 API (2.0 and later), for clang-retro
+ * (i386-pc-os2).
+ *
+ * Everything here is declared whatever INCL_ macros are defined: the Dos
+ * calls (bsedos.h), the error codes (bseerr.h) and, unless INCL_NOPMAPI
+ * is defined, a part of the Presentation Manager (pmwin.h).
+ *
+ * The 16-bit video, keyboard and mouse calls (Vio, Kbd, Mou) of OS/2 2.x
+ * need 16-bit thunks, which this SDK does not have yet.
+ */
+#ifndef __OS2_H
+#define __OS2_H
+
+#if !defined(__OS2__) || !defined(__32BIT__)
+#error This os2.h is for 32-bit OS/2 (--target=i386-pc-os2)
+#endif
+
+#include <os2def.h>
+#include <bsedos.h>
+#include <bseerr.h>
+#ifndef INCL_NOPMAPI
+#include <pmwin.h>
+#endif
+
+#endif /* __OS2_H */
