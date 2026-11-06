@@ -1,0 +1,15 @@
+# Testing on OS/2 Warp 3 in QEMU
+
+No install is needed. Warp 3's two boot diskettes boot to a CMD.EXE prompt
+once diskette 1's CONFIG.SYS starts `cmd.exe /k b:\run.cmd` instead of the
+installer. The programs under test go on a diskette in drive B:, each one's
+output goes to B:\NAME.out, and mtools reads it back afterwards.
+
+    ./mkwarp3.sh Disk00.img Disk01.img work   # Blue Spine floppy set
+    ./runtests.sh work 60 hello.exe sysinfo.exe
+
+Needs qemu-system-i386, mtools and python3. The last screen is saved as
+work/screen.ppm.
+
+OS/2 2.11 SMP hangs at "Loading, please wait..." in QEMU and OS/2 1.0 loops
+through CPU resets. Warp 3 runs both 16-bit (NE) and 32-bit (LX) programs.
