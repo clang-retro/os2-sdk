@@ -72,3 +72,19 @@ examples pass in all four memory models, and the 32-bit ones pass too.
 - 16-bit DLLs, and 16-bit Presentation Manager headers.
 - From 32-bit code, the 16-bit Vio, Kbd and Mou calls (they need thunks).
 - C++ (libc++), threads in the C library.
+
+## License
+
+The clang-retro OS/2 SDK is free software under the GNU Affero General Public
+License, version 3 only (`AGPL-3.0-only`); the full text is in
+[LICENSE](LICENSE). If you distribute a program built with it, or let
+people use a modified version over a network, you must offer the
+program's complete source under the same license.
+
+A commercial license, for programs that cannot meet those terms, is
+available from the clang-retro project; ask through
+[the clang-retro organization on GitHub](https://github.com/clang-retro).
+
+Contributions are accepted under the Contributor License Agreement in
+[CONTRIBUTING.md](CONTRIBUTING.md), which lets the project offer the
+code under both licenses.
