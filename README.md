@@ -69,7 +69,9 @@ heap is address space reserved with `DosAllocMem` and committed as
 `malloc` grows it. Programs are marked to run in a window (`pmcompatible`);
 `-mwindows` marks a PM program. A DLL (`-shared`) starts with `dllcrt0.o`,
 is initialized for each process that loads it, and has its data per
-process.
+process. Mark its exports with `__export` (or VisualAge's `_Export`, or
+`__attribute__((dllexport))`): clang leaves an `-export:` directive for
+each in the object, which JWlink reads.
 
 **16-bit.** clang compiles to OMF objects for a memory model (small,
 medium, compact or large; OS/2 has no tiny or huge model) and JWlink links
