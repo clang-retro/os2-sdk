@@ -1,0 +1,8 @@
+# The API reference of the documentation site (api/), run by .docs/hooks.py
+# from the repository's root after `mkdocs build`.
+@INCLUDE               = .docs/Doxyfile.base
+PROJECT_NAME           = "OS/2 SDK"
+PROJECT_BRIEF          = "The OS/2 1.x and 32-bit OS/2 API headers"
+INPUT                  = include
+FILE_PATTERNS          = *.h
+OPTIMIZE_OUTPUT_FOR_C  = YES
