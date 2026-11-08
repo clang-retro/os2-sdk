@@ -139,6 +139,15 @@ console and other devices. Files are binary. Directories are read with
 `getppid` work too. `chdir` sets the current directory of a drive but does
 not change the current drive.
 
+OS/2 has no `fork`, so programs are started with `DosExecPgm`: `system`
+runs `COMSPEC` (or `CMD.EXE` from the `PATH`) with `/c`, and
+`<process.h>` has the `spawn` calls of OS/2's C compilers (`spawnl`,
+`spawnv`, `spawnvp`, `spawnle` and the rest). `P_WAIT` returns the
+program's exit code, and `P_NOWAIT` its process id, which `waitpid` and
+`wait` wait for. `exec` starts the program and exits with its exit code.
+A name without an extension gets `.EXE`, and the `p` forms search the
+current directory and then the `PATH`. `popen` is not there yet.
+
 ## Testing
 
 `tests/` boots OS/2 Warp 3 from its two boot diskettes in QEMU and runs
@@ -148,7 +157,8 @@ examples pass in all four memory models, and the 32-bit ones pass too.
 semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
 `os2rc.py` bound into it with `DosGetResource` (16 and 32-bit), `tests/posix.c` tries
-the directory calls of the C library, and `tests/vio.c` the Vio, Kbd and
+the directory calls of the C library, `tests/spawn.c` starts itself with
+`spawn`, `exec` and `system` (16 and 32-bit), and `tests/vio.c` the Vio, Kbd and
 Mou calls from 32-bit code. `tests/testdll.c` is a 16-bit DLL that uses
 the C library and `tests/dllapp.c` a program that calls it, and starts
 itself again to check that the DLL's data is per process. All pass on
@@ -161,7 +171,7 @@ diskettes have no Presentation Manager, so PM programs are only built.
   one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
   common ones, and a call is added with a line in `tools/gen-bsesub.py`.
-- `system`, `spawn` and `exec` in the C library.
+- `popen` and `pipe` in the C library.
 - C++ (libc++), threads in the C library.
 
 ## License

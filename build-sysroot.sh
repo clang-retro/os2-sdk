@@ -112,6 +112,8 @@ case $bits in
   done
   OS=os2 MODELS=$models SYSROOT=$out WORK=$WORK sh "$DOS_SDK/scripts/build-builtins.sh"
   cp "$here"/include/os21x/*.h "$out/include/"
+  # The C library's own OS/2 header (spawn); the rest are the DOS ones.
+  cp "$WORK/picolibc-install-${models%% *}/include/process.h" "$out/include/"
   cp "$here/lib/os2-16.lnk" "$out/lib/os2/os2.lnk"
   ;;
 *)
