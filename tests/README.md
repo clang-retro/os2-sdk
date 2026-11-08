@@ -14,6 +14,14 @@ XDF.MSG, which is on diskette 0:
     mcopy -i Disk00.img ::/XDF.MSG .
     ./runtests.sh work 60 dosapi.exe XDF.MSG
 
+The programs run with B:\ as the current directory, where OS/2 finds
+DLLs (LIBPATH starts with `.`). The 16-bit DLL test, in each memory model:
+
+    clang --target=i8086-pc-os2 -mcmodel=small -shared testdll.c -o TESTDLL.DLL
+    python3 ../tools/os2-imports.py TESTDLL.DLL > testdll.lnk
+    clang --target=i8086-pc-os2 -mcmodel=small dllapp.c -Wl,@testdll.lnk -o DLLAPP.EXE
+    ./runtests.sh work 60 DLLAPP.EXE TESTDLL.DLL
+
 Needs qemu-system-i386, mtools and python3. The last screen is saved as
 work/screen.ppm.
 

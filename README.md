@@ -4,7 +4,7 @@ C programs for OS/2 with clang-retro's clang, picolibc and JWlink:
 
 | Target | Triple | Output | Runs on |
 | --- | --- | --- | --- |
-| 16-bit OS/2 1.x | `i8086-pc-os2` | NE program | OS/2 1.x, and 2.x to 4.x and ArcaOS |
+| 16-bit OS/2 1.x | `i8086-pc-os2` | NE program or DLL | OS/2 1.x, and 2.x to 4.x and ArcaOS |
 | 32-bit OS/2 | `i386-pc-os2` | LX program or DLL | OS/2 2.0 to 4.x, eComStation, ArcaOS |
 
 ```sh
@@ -13,6 +13,9 @@ clang --target=i386-pc-os2 -mwindows -Os pmhello.c -o pmhello.exe # 32-bit PM
 clang --target=i386-pc-os2 -shared -Os mylib.c -o MYLIB.DLL       # 32-bit DLL
 clang --target=i8086-pc-os2 -Os hello.c -o hello.exe              # 16-bit, small model
 clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, large model
+clang --target=i8086-pc-os2 -shared -Os mylib.c -o MYLIB.DLL      # 16-bit DLL
+python3 tools/os2-imports.py MYLIB.DLL > mylib.lnk                # its imports
+clang --target=i8086-pc-os2 -Os app.c -Wl,@mylib.lnk -o app.exe   # a program that uses it
 ```
 
 ## What's here
@@ -46,12 +49,13 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
   which compiles `tests/headers.c` against both sets of headers and checks
   the sizes of the structures. CI runs both. `os2rc.py` is a resource
   compiler (see below). `gen-bsesub.py` writes `bsesub.h` and the 16-bit
-  stubs.
+  stubs. `os2-imports.py` lists the exports of a 16 or 32-bit DLL as
+  `import` directives, for linking the programs that use it.
 - `build-sysroot.sh`: builds picolibc with its OS/2 layer, the compiler-rt
   builtins, and installs the headers and import lists:
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
   `build-sysroot.sh 16 i8086-msdos` adds the 16-bit libraries to the DOS
-  sysroot, in `lib/os2/<model>`.
+  sysroot, in `lib/os2/<model>` (and `lib/os2/<model>/dll`, below).
 - `examples/`: `hello.c` and `sysinfo.c` (both 16 and 32-bit), and two
   32-bit PM programs: `pmhello.c` (a window) and `pmnotes.c` (a menu,
   accelerators, dialogs and strings, from `pmnotes.rc`).
@@ -74,6 +78,23 @@ stack segment may not be DGROUP, so `va_list` and returned structures are
 far. The heap is the rest of DGROUP, grown to 64 KiB with `DosReallocSeg`,
 in the small and medium models, and a 64 KiB segment from `DosAllocSeg` in
 the compact and large ones.
+
+**16-bit DLLs.** `-shared` links a DLL with `libentry.obj` first. Like a
+32-bit DLL it is initialized for each process that loads it
+(`initinstance`) and each process gets its own DGROUP (`manyautodata`),
+so the C library in the DLL keeps a state for each; the initialization
+sets up the heap and `environ` and runs the constructors. OS/2 1.x has no
+call when a DLL is freed, so destructors and `atexit` functions of a DLL
+do not run. Export functions with `__export __far __pascal`; exported
+functions load the DLL's DGROUP into `DS` themselves, as with `__loadds`.
+A DLL runs on the stack of the thread that calls it, so `SS` is not `DS`
+and a near pointer cannot point to a local. In the small and medium models
+clang (`-mwindows-dll`, which `-shared` gives) keeps the locals whose
+address escapes in a frame in DGROUP instead, from a 4 KiB region for each
+thread taken from the DLL's heap; a DLL that needs more defines
+`unsigned short __os2_dll_frame_size = 8192;`. The C library built this
+way is in `lib/os2/<model>/dll`, which clang links with `-shared`. Compact
+and large DLLs need none of it.
 
 **Vio, Kbd and Mou from 32-bit code.** These calls are 16-bit far
 Pascal functions in VIOCALLS, KBDCALLS and MOUCALLS. Each function of
@@ -118,12 +139,17 @@ semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
 `os2rc.py` bound into it with `DosGetResource`, `tests/posix.c` tries
 the directory calls of the C library, and `tests/vio.c` the Vio, Kbd and
-Mou calls from 32-bit code; all pass on Warp 3. Warp 3's boot
+Mou calls from 32-bit code. `tests/testdll.c` is a 16-bit DLL that uses
+the C library and `tests/dllapp.c` a program that calls it, and starts
+itself again to check that the DLL's data is per process. All pass on
+Warp 3, the DLL in all four memory models. Warp 3's boot
 diskettes have no Presentation Manager, so PM programs are only built.
 
 ## Not yet
 
-- 16-bit DLLs, and 16-bit Presentation Manager headers.
+- 16-bit Presentation Manager headers.
+- Threads calling into a 16-bit DLL at once: the C library is built for
+  one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
   common ones, and a call is added with a line in `tools/gen-bsesub.py`.
 - Resources in 16-bit programs.

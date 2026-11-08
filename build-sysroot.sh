@@ -9,8 +9,9 @@
 #                              the 16-bit OS/2 1.x libraries, into an
 #                              i8086-msdos sysroot that dos-sdk built:
 #                              include/os2.h ..., lib/os2/os2.lnk and
-#                              lib/os2/<model>/{crt0.obj,libc.a,
-#                              libclang_rt.builtins.a}
+#                              lib/os2/<model>/{crt0.obj,libentry.obj,
+#                              libc.a,libclang_rt.builtins.a} and
+#                              lib/os2/{small,medium}/dll/libc.a
 #
 #   BIN           directory with clang, llvm-ar and the other LLVM tools
 #   LLVM_SRC      clang-retro/llvm checkout (compiler-rt)
@@ -90,11 +91,24 @@ case $bits in
   models=${OS2_MODELS:-small medium compact large}
   mkdir -p "$out/lib/os2"
   for m in $models; do
-    picolibc "$PICOLIBC_SRC/scripts/cross-clang-i8086-os2-$m.txt" \
-      "$WORK/picolibc-$m" "$WORK/picolibc-install-$m"
+    cross="$PICOLIBC_SRC/scripts/cross-clang-i8086-os2-$m.txt"
+    picolibc "$cross" "$WORK/picolibc-$m" "$WORK/picolibc-install-$m"
     mkdir -p "$out/lib/os2/$m"
     cp "$WORK/picolibc-install-$m/lib/crt0.obj" \
+       "$WORK/picolibc-install-$m/lib/libentry.obj" \
        "$WORK/picolibc-install-$m/lib/libc.a" "$out/lib/os2/$m/"
+    # DLLs in the near data models run with SS != DS and need the C
+    # library built for that (-mwindows-dll), in <model>/dll.
+    case $m in small|medium)
+      sed "s|'-nostdlib'\]|'-nostdlib', '-mwindows-dll']|; s|@DIRNAME@|$PICOLIBC_SRC/scripts|" \
+        "$cross" >"$WORK/cross-os2-dll-$m.txt"
+      grep -q mwindows-dll "$WORK/cross-os2-dll-$m.txt" ||
+        { echo "cannot add -mwindows-dll to $cross" >&2; exit 1; }
+      picolibc "$WORK/cross-os2-dll-$m.txt" "$WORK/picolibc-dll-$m" \
+        "$WORK/picolibc-install-dll-$m"
+      mkdir -p "$out/lib/os2/$m/dll"
+      cp "$WORK/picolibc-install-dll-$m/lib/libc.a" "$out/lib/os2/$m/dll/" ;;
+    esac
   done
   OS=os2 MODELS=$models SYSROOT=$out WORK=$WORK sh "$DOS_SDK/scripts/build-builtins.sh"
   cp "$here"/include/os21x/*.h "$out/include/"
