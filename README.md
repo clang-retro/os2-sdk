@@ -31,7 +31,10 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
   spaces, colors, lines, areas, paths, fonts and bitmaps (`pmgpi.h`); the
   window list and profiles (`pmshl.h`); and the file dialog
   (`pmstddlg.h`). `APIENTRY` is the C convention, which is what OS/2's
-  `_System` is.
+  `_System` is. The video, keyboard and mouse calls (Vio, Kbd, Mou), which
+  are 16-bit on every OS/2, are in `bsesub.h` (see below).
+- `lib/call16.c`: the thunk from 32-bit code into the 16-bit API, built
+  into `libos2.a` with a 16-bit stub for each call of `bsesub.h`.
 - `lib/os2-16.lnk`, `lib/os2-32.lnk`: `import` directives for every entry
   point of the OS/2 system DLLs (DOSCALLS, VIOCALLS, KBDCALLS, MOUCALLS,
   MSG, NLS, PMWIN, PMGPI and the rest). The driver gives them to the
@@ -42,7 +45,8 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
   every function the headers declare has an import, and `check-syntax.sh`,
   which compiles `tests/headers.c` against both sets of headers and checks
   the sizes of the structures. CI runs both. `os2rc.py` is a resource
-  compiler (see below).
+  compiler (see below). `gen-bsesub.py` writes `bsesub.h` and the 16-bit
+  stubs.
 - `build-sysroot.sh`: builds picolibc with its OS/2 layer, the compiler-rt
   builtins, and installs the headers and import lists:
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
@@ -70,6 +74,16 @@ stack segment may not be DGROUP, so `va_list` and returned structures are
 far. The heap is the rest of DGROUP, grown to 64 KiB with `DosReallocSeg`,
 in the small and medium models, and a 64 KiB segment from `DosAllocSeg` in
 the compact and large ones.
+
+**Vio, Kbd and Mou from 32-bit code.** These calls are 16-bit far
+Pascal functions in VIOCALLS, KBDCALLS and MOUCALLS. Each function of
+`bsesub.h` is an inline one that lays out the 16-bit arguments and calls
+`__os2_call16` (`lib/call16.c`, in `libos2.a`, which the driver links).
+That switches to a 16-bit stack of the thread's own and jumps to the
+call's stub, 16-bit code in the program that calls the function (`call far
+VIO16WRTTTY`, fixed up by the loader as in a 16-bit program) and comes
+back. Pointers become 16:16 ones through the tiles of OS/2's memory, and a
+buffer that crosses a 64 KiB boundary is copied for the call.
 
 **Resources.** `tools/os2rc.py` compiles a `.rc` file in the OS/2
 toolkits' resource language (STRINGTABLE, MENU, ACCELTABLE, DLGTEMPLATE
@@ -102,14 +116,16 @@ examples pass in all four memory models, and the 32-bit ones pass too.
 `tests/dosapi.c` exercises the 32-bit Dos calls (exception handlers,
 semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
-`os2rc.py` bound into it with `DosGetResource`, and `tests/posix.c` tries
-the directory calls of the C library; all pass on Warp 3. Warp 3's boot
+`os2rc.py` bound into it with `DosGetResource`, `tests/posix.c` tries
+the directory calls of the C library, and `tests/vio.c` the Vio, Kbd and
+Mou calls from 32-bit code; all pass on Warp 3. Warp 3's boot
 diskettes have no Presentation Manager, so PM programs are only built.
 
 ## Not yet
 
 - 16-bit DLLs, and 16-bit Presentation Manager headers.
-- From 32-bit code, the 16-bit Vio, Kbd and Mou calls (they need thunks).
+- The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
+  common ones, and a call is added with a line in `tools/gen-bsesub.py`.
 - Resources in 16-bit programs.
 - `system`, `spawn` and `exec` in the C library.
 - C++ (libc++), threads in the C library.
