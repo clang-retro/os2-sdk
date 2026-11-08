@@ -20,16 +20,23 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
 - `include/os21x/`: the 16-bit OS/2 1.x API (`os2.h`): types, the Dos
   calls, Vio, Kbd and Mou, and the error codes. Every function is
   `__far __pascal` with far pointers, as in the IBM and Microsoft toolkits.
-- `include/os2v2/`: the 32-bit API (`os2.h`): the Dos calls, the error codes
-  and a part of the Presentation Manager (windows, messages, painting,
-  message boxes). `APIENTRY` is the C convention, which is what OS/2's
-  `_System` is.
+- `include/os2v2/`: the 32-bit API (`os2.h`): the Dos calls (files and
+  extended attributes, large files, memory, threads, semaphores and
+  timers, queues, named pipes, sessions, exception handlers, modules and
+  resources, national language support, messages, file systems and device
+  IOCTLs), the error codes, and a part of the Presentation Manager
+  (windows, messages, painting, message boxes). `APIENTRY` is the C
+  convention, which is what OS/2's `_System` is.
 - `lib/os2-16.lnk`, `lib/os2-32.lnk`: `import` directives for every entry
   point of the OS/2 system DLLs (DOSCALLS, VIOCALLS, KBDCALLS, MOUCALLS,
   MSG, NLS, PMWIN, PMGPI and the rest). The driver gives them to the
   linker, which keeps only the imports a program uses. They were made by
   `tools/gen-imports.py` from the DLL export lists in Open Watcom's
   `bld/os2api/lib286` and `lib386` (the names and ordinals only).
+- `tools/`: `gen-imports.py` (above), `check-headers.py`, which checks that
+  every function the headers declare has an import, and `check-syntax.sh`,
+  which compiles `tests/headers.c` against both sets of headers and checks
+  the sizes of the structures. CI runs both.
 - `build-sysroot.sh`: builds picolibc with its OS/2 layer, the compiler-rt
   builtins, and installs the headers and import lists:
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
@@ -66,6 +73,9 @@ console and other devices. Files are binary.
 `tests/` boots OS/2 Warp 3 from its two boot diskettes in QEMU and runs
 programs from a diskette in drive B: (see `tests/README.md`). The 16-bit
 examples pass in all four memory models, and the 32-bit ones pass too.
+`tests/dosapi.c` exercises the 32-bit Dos calls (exception handlers,
+semaphores, queues, named pipes, timers, NLS, file systems, messages and
+extended attributes), and passes on Warp 3.
 
 ## Not yet
 
