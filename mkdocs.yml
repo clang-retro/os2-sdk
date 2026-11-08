@@ -1,0 +1,30 @@
+# The documentation site: https://clang-retro.github.io/os2-sdk/
+# Build it with `pip install -r .docs/requirements.txt` and `mkdocs serve`.
+INHERIT: .docs/base.yml
+site_name: OS/2 SDK
+site_description: 16-bit OS/2 1.x and 32-bit OS/2 programs with clang
+site_url: https://clang-retro.github.io/os2-sdk/
+repo_url: https://github.com/clang-retro/os2-sdk
+repo_name: clang-retro/os2-sdk
+edit_uri: ""
+hooks:
+  - .docs/hooks.py
+
+extra:
+  retro:
+    github: clang-retro/os2-sdk
+    branch: main
+    pages:
+      README.md: index.md
+      tests/README.md: testing.md
+      CONTRIBUTING.md: contributing.md
+
+nav:
+  - "Home": index.md
+  - "What's here": contents.md
+  - "How programs are built": building.md
+  - "Testing": testing.md
+  - "Not yet": status.md
+  - "Contributing": contributing.md
+  - "License": license.md
+  - "All clang-retro projects": https://clang-retro.github.io/dos-sdk/projects/
