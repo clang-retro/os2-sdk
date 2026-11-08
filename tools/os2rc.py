@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""os2rc.py - compile OS/2 resources and bind them into a 32-bit program.
+"""os2rc.py - compile OS/2 resources and bind them into a program.
 
     os2rc.py [-I DIR]... [-D NAME[=VALUE]]... APP.RC APP.EXE
-    os2rc.py [-I DIR]... -r APP.RC APP.RES      (compile only)
+    os2rc.py [-16] [-I DIR]... -r APP.RC APP.RES (compile only)
     os2rc.py APP.RES APP.EXE                    (bind compiled resources)
     os2rc.py -l APP.EXE                         (list a program's resources)
 
@@ -54,9 +54,11 @@ CONTAINER, NOTEBOOK, SLIDER, VALUESET and CONTROL "text", id, x, y, cx,
 cy, class, style. A DIALOG, WINDOW or FRAME may have PRESPARAMS and
 CTLDATA.
 
-Binding adds the resources to the program as one more object (readable,
-shared, discardable), sorted by type and id as OS/2 requires, the way the
-toolkits' RC does. A .RES file here is this tool's own: "OS2RES1\\0"
+Binding adds the resources to a 32-bit (LX) program as one more object
+(readable, shared, discardable), sorted by type and id as OS/2 requires,
+the way the toolkits' RC does. A 16-bit (NE) program gets one segment
+per resource. For a 16-bit program the headers are those of
+include/os21x, without __32BIT__ (-16 says so when only compiling). A .RES file here is this tool's own: "OS2RES1\\0"
 then, for each resource, type, id (16 bits each), size (32 bits) and the
 data.
 
@@ -123,9 +125,11 @@ class Preprocessor:
     """#include, #define, #undef and conditionals. Lines of included .h
     files other than directives are dropped."""
 
-    def __init__(self, incdirs, defines):
+    def __init__(self, incdirs, defines, bits16=False):
         self.incdirs = incdirs
-        self.macros = {"RC_INVOKED": "1", "__OS2__": "1", "__32BIT__": "1"}
+        self.macros = {"RC_INVOKED": "1", "__OS2__": "1"}
+        if not bits16:
+            self.macros["__32BIT__"] = "1"
         self.macros.update(defines)
         self.funcs = set()
         self.out = []
@@ -965,9 +969,129 @@ def bind(exe, res):
     return bytes(out)
 
 
+# --- Binding into an NE program ----------------------------------------------
+#
+# A 16-bit (OS/2 1.x) program keeps each resource in a segment of its own,
+# the last ones of the segment table, and its resource table lists their
+# types and ids, one pair of 16-bit words per segment.
+
+NSDATA, NSMOVE, NSPURE, NSRELOC, NSDISCARD = 1, 0x10, 0x20, 0x100, 0x1000
+NSREADONLY, NSDPL3 = 0x80, 0xC00
+NE_RES_FLAGS = NSDATA | NSMOVE | NSPURE | NSREADONLY | NSDPL3 | NSDISCARD
+
+
+def ne_header(exe):
+    if exe[:2] != b"MZ":
+        return None
+    ne = u32(exe, 0x3C)
+    return ne if exe[ne:ne + 2] == b"NE" else None
+
+
+def u16(b, o):
+    return struct.unpack_from("<H", b, o)[0]
+
+
+def list_ne_resources(exe, ne):
+    g = lambda o: u16(exe, ne + o)
+    names = {v: k for k, v in RT.items() if k != "ICON"}
+    cseg, cres, shift = g(0x1C), g(0x34), g(0x32)
+    for n in range(cres):
+        t, i = struct.unpack_from("<HH", exe, ne + g(0x24) + 4 * n)
+        seg = cseg - cres + n
+        size = u16(exe, ne + g(0x22) + 8 * seg + 2) or 0x10000
+        print("%-12s %5d  %6d bytes  segment %d"
+              % (names.get(t, str(t)), i, size, seg + 1))
+
+
+def bind_ne(exe, ne, res):
+    """Return the 16-bit program with RES as its resources."""
+    h = bytearray(exe[ne:ne + 0x40])
+    g = lambda o: u16(h, o)
+    if g(0x34):
+        raise RcError("the program already has resources")
+    cseg, shift = g(0x1C), g(0x32)
+    segtab, rsrctab = g(0x22), g(0x24)
+    nrestab, cbnres = u32(h, 0x2C), g(0x20)
+    if rsrctab != segtab + 8 * cseg:
+        raise RcError("unexpected layout of the NE header")
+    tables_end = ne + max(g(0x04) + g(0x06), g(0x2A))
+    if cbnres:
+        tables_end = max(tables_end, nrestab + cbnres)
+    segs = [list(struct.unpack_from("<HHHH", exe, ne + segtab + 8 * n))
+            for n in range(cseg)]
+    # Each segment's bytes in the file, and its relocations after them.
+    chunks = []
+    data_end = tables_end
+    for sector, size, flags, _ in segs:
+        if not sector:
+            chunks.append(b"")
+            continue
+        start = sector << shift
+        n = size or 0x10000
+        if flags & NSRELOC:
+            n += 2 + 8 * u16(exe, start + n)
+        chunks.append(exe[start:start + n])
+        data_end = max(data_end, start + n)
+    if any(sector and sector << shift < tables_end for sector, *_ in segs):
+        raise RcError("unexpected layout of the NE program")
+    trailer = exe[data_end:]
+
+    items = sorted(res.items())
+    for (t, i), data in items:
+        if len(data) > 0x10000:
+            raise RcError("resource %d of type %d is over 64 KB" % (i, t))
+    grow = 12 * len(items)
+    head_len = tables_end + grow
+    total = head_len + sum(len(c) for c in chunks) + \
+        sum(len(d) for _, d in items) + 512 * (cseg + len(items))
+    while total >> shift >= 0x10000:
+        shift += 1
+    align = 1 << shift
+
+    out = bytearray(exe[:ne + segtab + 8 * cseg])
+    out[ne:ne + 0x40] = h
+    newsegs = bytearray()
+    body = bytearray()
+    pos = (head_len + align - 1) & ~(align - 1)
+
+    def place(data):
+        nonlocal pos
+        at = pos
+        body.extend(b"\0" * (at - head_len - len(body)))
+        body.extend(data)
+        pos = (at + len(data) + align - 1) & ~(align - 1)
+        return at >> shift
+
+    for (sector, size, flags, minalloc), chunk in zip(segs, chunks):
+        sector = place(chunk) if chunk else 0
+        newsegs += struct.pack("<HHHH", sector, size, flags, minalloc)
+    table = bytearray()
+    for (t, i), data in items:
+        size = len(data) & 0xFFFF
+        newsegs += struct.pack("<HHHH", place(data), size, NE_RES_FLAGS, size)
+        table += struct.pack("<HH", t, i)
+    out[ne + segtab:] = newsegs
+    out += table + exe[ne + rsrctab:tables_end]
+    assert len(out) == head_len
+    out += body
+    out += b"\0" * (-len(out) % align) + trailer
+
+    put = lambda o, v: struct.pack_into("<H", out, ne + o, v)
+    put(0x1C, cseg + len(items))
+    put(0x34, len(items))
+    put(0x32, shift)
+    put(0x24, rsrctab + 8 * len(items))
+    for o in (0x04, 0x26, 0x28, 0x2A):  # entry, names, modules, imports
+        put(o, g(o) + grow)
+    if cbnres:
+        struct.pack_into("<L", out, ne + 0x2C, nrestab + grow)
+    struct.pack_into("<L", out, ne + 0x38, 0)  # no fast-load area
+    return bytes(out)
+
+
 def main(argv):
     incdirs, defines, args = [], {}, []
-    compile_only = listing = False
+    compile_only = listing = bits16 = False
     it = iter(argv)
     for a in it:
         if a == "-I":
@@ -982,19 +1106,33 @@ def main(argv):
             compile_only = True
         elif a == "-l":
             listing = True
+        elif a == "-16":
+            bits16 = True
         elif a in ("-h", "--help"):
             print(__doc__)
             return 0
         else:
             args.append(a)
+    exe = ne = None
+    if len(args) == 2 and not compile_only and not listing:
+        with open(args[1], "rb") as f:
+            exe = f.read()
+        ne = ne_header(exe)
+        bits16 = bits16 or ne is not None
     here = os.path.dirname(os.path.abspath(__file__))
-    for d in (os.path.join(here, "..", "include", "os2v2"),
+    for d in (os.path.join(here, "..", "include",
+                           "os21x" if bits16 else "os2v2"),
               os.path.join(here, "..", "include")):
         if os.path.isdir(d):
             incdirs.append(d)
     if listing:
         with open(args[0], "rb") as f:
-            list_resources(f.read())
+            exe = f.read()
+        ne = ne_header(exe)
+        if ne is None:
+            list_resources(exe)
+        else:
+            list_ne_resources(exe, ne)
         return 0
     if len(args) != 2:
         print(__doc__.split("\n\n")[1], file=sys.stderr)
@@ -1003,16 +1141,14 @@ def main(argv):
     if src.lower().endswith(".res"):
         res = read_res(src)
     else:
-        pp = Preprocessor(incdirs, defines)
+        pp = Preprocessor(incdirs, defines, bits16)
         pp.run(src)
         res = Compiler(Lexer(pp.out), os.path.dirname(os.path.abspath(src)),
                        incdirs).compile()
     if compile_only:
         write_res(dst, res)
         return 0
-    with open(dst, "rb") as f:
-        exe = f.read()
-    out = bind(exe, res)
+    out = bind(exe, res) if ne is None else bind_ne(exe, ne, res)
     with open(dst, "wb") as f:
         f.write(out)
     return 0

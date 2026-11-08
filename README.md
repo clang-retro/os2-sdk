@@ -118,17 +118,19 @@ buffer that crosses a 64 KiB boundary is copied for the call.
 toolkits' resource language (STRINGTABLE, MENU, ACCELTABLE, DLGTEMPLATE
 with DIALOG, FRAME, WINDOW, CONTROL and the predefined controls, RCDATA,
 ICON, POINTER, BITMAP, FONT and user types, with `#include` and `#define`
-from the headers) and binds the resources into a 32-bit program, as one
-more object of the LX file:
+from the headers) and binds the resources into a program: a 32-bit one
+gets one more object in its LX file, and a 16-bit one a segment for each
+resource in its NE file, which `DosGetResource2` returns:
 
 ```sh
 clang --target=i386-pc-os2 -mwindows -Os pmnotes.c -o pmnotes.exe
 python3 tools/os2rc.py -I include/os2v2 examples/pmnotes.rc pmnotes.exe
 python3 tools/os2rc.py -l pmnotes.exe     # list the resources
+python3 tools/os2rc.py app.rc app16.exe   # a 16-bit program: os21x headers
 ```
 
-`-r` compiles to a `.res` file only, which a later run binds. 16-bit (NE)
-programs can't have resources bound yet.
+`-r` compiles to a `.res` file only, which a later run binds (`-16 -r`
+for a 16-bit program, whose `.rc` sees the `os21x` headers).
 
 The C library is picolibc with an OS/2 layer (`libos/os2`): a file
 descriptor is the OS/2 file handle, and `\n` is written as `\r\n` to the
@@ -145,7 +147,7 @@ examples pass in all four memory models, and the 32-bit ones pass too.
 `tests/dosapi.c` exercises the 32-bit Dos calls (exception handlers,
 semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
-`os2rc.py` bound into it with `DosGetResource`, `tests/posix.c` tries
+`os2rc.py` bound into it with `DosGetResource` (16 and 32-bit), `tests/posix.c` tries
 the directory calls of the C library, and `tests/vio.c` the Vio, Kbd and
 Mou calls from 32-bit code. `tests/testdll.c` is a 16-bit DLL that uses
 the C library and `tests/dllapp.c` a program that calls it, and starts
@@ -159,7 +161,6 @@ diskettes have no Presentation Manager, so PM programs are only built.
   one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
   common ones, and a call is added with a line in `tools/gen-bsesub.py`.
-- Resources in 16-bit programs.
 - `system`, `spawn` and `exec` in the C library.
 - C++ (libc++), threads in the C library.
 
