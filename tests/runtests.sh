@@ -1,7 +1,8 @@
 #!/bin/sh
 # runtests.sh WORKDIR SECONDS PROGRAM.exe... : run each program under OS/2
 # Warp 3 in QEMU and print what it wrote. WORKDIR comes from mkwarp3.sh.
-# Other files given (not .exe) are copied to B: for the programs to use.
+# Other files given (not .exe) are copied to B: for the programs to use,
+# such as DLLs.
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 work=$(cd "$1" && pwd)
@@ -15,9 +16,12 @@ for f in "$@"; do
   mcopy -i "$img" "$f" ::/
   case $f in
   *.exe) names="$names $(basename "$f" .exe)" ;;
+  *.EXE) names="$names $(basename "$f" .EXE)" ;;
   esac
 done
-printf '@echo off\r\nfor %%%%f in (%s) do call b:\\one %%%%f\r\n' "$names" > "$work/run.cmd"
+# B:\ is the current directory, so that programs find DLLs there (LIBPATH
+# starts with ".").
+printf '@echo off\r\nb:\r\ncd \\\r\nfor %%%%f in (%s) do call b:\\one %%%%f\r\n' "$names" > "$work/run.cmd"
 printf '@echo off\r\nb:\\%%1 > b:\\%%1.out 2>&1\r\n' > "$work/one.cmd"
 mcopy -i "$img" "$work/run.cmd" "$work/one.cmd" ::/
 qemu-system-i386 -m 32 -cpu pentium -machine pc \
