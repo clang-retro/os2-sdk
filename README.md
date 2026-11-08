@@ -62,6 +62,9 @@ clang --target=i8086-pc-os2 -Os app.c -Wl,@mylib.lnk -o app.exe   # a program th
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
   `build-sysroot.sh 16 i8086-msdos` adds the 16-bit libraries to the DOS
   sysroot, in `lib/os2/<model>` (and `lib/os2/<model>/dll`, below).
+- `build-libcxx.sh`: builds libc++ and libc++abi for 32-bit OS/2, with
+  exceptions, RTTI and threads, into the `i386-os2` sysroot, and the
+  unwinder `runtime/unwind-sjlj.c` as `libunwind.a`.
 - `examples/`: `hello.c`, `sysinfo.c` and the PM window `pmhello.c` (all
   16 and 32-bit), and the 32-bit PM program `pmnotes.c` (a menu,
   accelerators, dialogs and strings, from `pmnotes.rc`).
@@ -150,6 +153,28 @@ current directory and then the `PATH`. `pipe`, `dup` and `dup2` work on
 OS/2's handles, and `popen` runs the command with this program's end of
 the pipe kept from it, so `pclose` gives it the end of its input.
 
+## Threads and C++
+
+32-bit programs have threads: `<threads.h>` (C11 `thrd_create`, mutexes,
+condition variables, `tss`) runs on `DosCreateThread` and OS/2's mutex and
+event semaphores, the C library locks itself, and `__thread` variables,
+`errno` among them, are per thread through clang's emulated TLS. The OS/2
+Dos calls for threads and semaphores are in `os2.h` too.
+
+C++ programs (`clang++ --target=i386-pc-os2`) link libc++ once
+`build-libcxx.sh` has run:
+
+```sh
+BIN=/path/to/clang-retro/bin LLVM_SRC=/path/to/llvm \
+  sh build-libcxx.sh /path/to/clang-retro/i386-os2
+```
+
+Exceptions unwind through setjmp/longjmp-style function contexts (an LX
+program keeps no tables for a table-driven unwinder), one chain per
+thread. `std::thread`, `std::mutex`, `std::condition_variable`,
+`thread_local` and `steady_clock` work. The terminate message does not
+demangle names, which keeps programs smaller.
+
 ## Testing
 
 `tests/` boots OS/2 Warp 3 from its two boot diskettes in QEMU and runs
@@ -160,7 +185,10 @@ semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
 `os2rc.py` bound into it with `DosGetResource` (16 and 32-bit), `tests/posix.c` tries
 the directory calls of the C library, `tests/spawn.c` starts itself with
-`spawn`, `exec`, `system` and `popen` and tries `pipe` (16 and 32-bit), and `tests/vio.c` the Vio, Kbd and
+`spawn`, `exec`, `system` and `popen` and tries `pipe` (16 and 32-bit),
+`tests/threads.c` the C11 threads, locks and per-thread `errno`,
+`tests/cxx.cpp` C++ exceptions (in four threads at once too), RTTI,
+iostreams and `std::thread`, and `tests/vio.c` the Vio, Kbd and
 Mou calls from 32-bit code. `tests/testdll.c` is a 16-bit DLL that uses
 the C library and `tests/dllapp.c` a program that calls it, and starts
 itself again to check that the DLL's data is per process. All pass on
@@ -169,11 +197,11 @@ diskettes have no Presentation Manager, so PM programs are only built.
 
 ## Not yet
 
-- Threads calling into a 16-bit DLL at once: the C library is built for
-  one thread.
+- Threads calling into a 16-bit DLL at once: the 16-bit C library is
+  built for one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
   common ones, and a call is added with a line in `tools/gen-bsesub.py`.
-- C++ (libc++), threads in the C library.
+- Threads and C++ in 16-bit programs.
 
 ## License
 

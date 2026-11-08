@@ -24,6 +24,7 @@ nav:
   - "Home": index.md
   - "What's here": contents.md
   - "How programs are built": building.md
+  - "Threads and C++": threads.md
   - "Testing": testing.md
   - "Not yet": status.md
   - "Contributing": contributing.md

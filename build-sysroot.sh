@@ -34,21 +34,24 @@ export PATH
 MSDOS_LD=${MSDOS_LD:-$BIN/jwlink}
 export MSDOS_LD
 
-picolibc() { # cross-file build-dir install-dir
-  rm -rf "$2" "$3"
-  meson setup "$2" "$PICOLIBC_SRC" --cross-file "$1" \
+picolibc() { # cross-file build-dir install-dir [meson options]
+  cross=$1 build=$2 install=$3
+  shift 3
+  rm -rf "$build" "$install"
+  meson setup "$build" "$PICOLIBC_SRC" --cross-file "$cross" \
     -Dos-os2=true -Dmultilib=false -Dpicocrt=false -Dsemihost=false \
-    -Dtests=false -Dposix-console=true -Dsingle-thread=true \
-    -Dthread-local-storage=false -Dspecsdir=none \
-    --prefix="$3" >"$2.log" 2>&1 || { tail -20 "$2.log"; exit 1; }
-  ninja -C "$2" install >>"$2.log" 2>&1 ||
-    { grep -E 'error|FAILED' "$2.log" | head -20; exit 1; }
+    -Dtests=false -Dposix-console=true -Dspecsdir=none "$@" \
+    --prefix="$install" >"$build.log" 2>&1 || { tail -20 "$build.log"; exit 1; }
+  ninja -C "$build" install >>"$build.log" 2>&1 ||
+    { grep -E 'error|FAILED' "$build.log" | head -20; exit 1; }
 }
 
 case $bits in
 32)
   picolibc "$PICOLIBC_SRC/scripts/cross-clang-i386-os2.txt" \
-    "$WORK/picolibc" "$WORK/picolibc-install"
+    "$WORK/picolibc" "$WORK/picolibc-install" \
+    -Dsingle-thread=false -Dthread-local-storage=true \
+    -Dthread-local-storage-api=false
   cp -R "$WORK/picolibc-install/include/." "$out/include/"
   for f in crt0.o dllcrt0.o libc.a libm.a; do
     cp "$WORK/picolibc-install/lib/$f" "$out/lib/"
@@ -92,7 +95,8 @@ case $bits in
   mkdir -p "$out/lib/os2"
   for m in $models; do
     cross="$PICOLIBC_SRC/scripts/cross-clang-i8086-os2-$m.txt"
-    picolibc "$cross" "$WORK/picolibc-$m" "$WORK/picolibc-install-$m"
+    picolibc "$cross" "$WORK/picolibc-$m" "$WORK/picolibc-install-$m" \
+      -Dsingle-thread=true -Dthread-local-storage=false
     mkdir -p "$out/lib/os2/$m"
     cp "$WORK/picolibc-install-$m/lib/crt0.obj" \
        "$WORK/picolibc-install-$m/lib/libentry.obj" \
@@ -105,7 +109,8 @@ case $bits in
       grep -q mwindows-dll "$WORK/cross-os2-dll-$m.txt" ||
         { echo "cannot add -mwindows-dll to $cross" >&2; exit 1; }
       picolibc "$WORK/cross-os2-dll-$m.txt" "$WORK/picolibc-dll-$m" \
-        "$WORK/picolibc-install-dll-$m"
+        "$WORK/picolibc-install-dll-$m" \
+        -Dsingle-thread=true -Dthread-local-storage=false
       mkdir -p "$out/lib/os2/$m/dll"
       cp "$WORK/picolibc-install-dll-$m/lib/libc.a" "$out/lib/os2/$m/dll/" ;;
     esac
