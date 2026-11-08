@@ -1,0 +1,35 @@
+/* Resources for restest.c: os2rc.py restest.rc restest.exe */
+#include <os2.h>
+
+STRINGTABLE
+BEGIN
+    1, "one"
+    18 "eighteen"
+END
+
+MENU 1
+BEGIN
+    SUBMENU "~File", 10
+    BEGIN
+        MENUITEM "E~xit\tF3", 11
+    END
+END
+
+ACCELTABLE 1
+BEGIN
+    VK_F3, 11, VIRTUALKEY
+    "^Q", 11
+END
+
+DLGTEMPLATE 1
+BEGIN
+    DIALOG "Test", 1, 10, 10, 100, 50, , FCF_TITLEBAR
+    BEGIN
+        DEFPUSHBUTTON "OK", DID_OK, 30, 5, 40, 14
+    END
+END
+
+RCDATA 7
+BEGIN
+    0x1234, 0x56789ABCL, "xyz"
+END

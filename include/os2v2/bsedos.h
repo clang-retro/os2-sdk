@@ -185,6 +185,8 @@ APIRET APIENTRY DosSleep(ULONG msec);
 APIRET APIENTRY DosBeep(ULONG freq, ULONG dur);
 
 /* Files */
+#define CCHMAXPATH     260
+#define CCHMAXPATHCOMP 256
 #define FILE_BEGIN   0
 #define FILE_CURRENT 1
 #define FILE_END     2
@@ -419,6 +421,30 @@ APIRET APIENTRY DosFreeThreadLocalMemory(PULONG p);
 #define PT_32BIT 1
 APIRET APIENTRY DosQueryProcType(HMODULE hmod, ULONG ordinal, PCSZ pszName,
                                  PULONG pulproctype);
+/* Resource types, as os2rc.py writes them */
+#define RT_POINTER      1   /* also icons */
+#define RT_BITMAP       2
+#define RT_MENU         3
+#define RT_DIALOG       4   /* DLGTEMPLATE */
+#define RT_STRING       5   /* sixteen strings: id / 16 + 1 */
+#define RT_FONTDIR      6
+#define RT_FONT         7
+#define RT_ACCELTABLE   8
+#define RT_RCDATA       9
+#define RT_MESSAGE      10
+#define RT_DLGINCLUDE   11
+#define RT_VKEYTBL      12
+#define RT_KEYTBL       13
+#define RT_CHARTBL      14
+#define RT_DISPLAYINFO  15
+#define RT_FKASHORT     16
+#define RT_FKALONG      17
+#define RT_HELPTABLE    18
+#define RT_HELPSUBTABLE 19
+#define RT_FDDIR        20
+#define RT_FD           21
+#define RT_MAX          22
+#define RT_RESNAMES     255
 APIRET APIENTRY DosGetResource(HMODULE hmod, ULONG idType, ULONG idName, PPVOID ppb);
 APIRET APIENTRY DosFreeResource(PVOID pb);
 APIRET APIENTRY DosQueryResourceSize(HMODULE hmod, ULONG idt, ULONG idn, PULONG pulsize);

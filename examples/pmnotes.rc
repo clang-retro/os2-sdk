@@ -1,0 +1,53 @@
+/* Resources for pmnotes.c, compiled and bound into the program with
+ *   python3 tools/os2rc.py -I include/os2v2 pmnotes.rc pmnotes.exe
+ */
+#include <os2.h>
+#include "pmnotes.h"
+
+STRINGTABLE
+BEGIN
+    IDS_GREETING, "Hello, %s!"
+    IDS_NONAME,   "Choose File > Name to say who you are."
+END
+
+MENU ID_MAIN
+BEGIN
+    SUBMENU "~File", IDM_FILE
+    BEGIN
+        MENUITEM "~Name...\tCtrl+N", IDM_NAME
+        MENUITEM SEPARATOR
+        MENUITEM "E~xit\tF3", IDM_EXIT
+    END
+    SUBMENU "~Help", IDM_HELP
+    BEGIN
+        MENUITEM "~About...", IDM_ABOUT
+    END
+END
+
+ACCELTABLE ID_MAIN
+BEGIN
+    "^N",  IDM_NAME
+    VK_F3, IDM_EXIT, VIRTUALKEY
+END
+
+DLGTEMPLATE IDD_NAME
+BEGIN
+    DIALOG "Your name", IDD_NAME, 20, 20, 180, 60, WS_VISIBLE,
+           FCF_TITLEBAR | FCF_SYSMENU | FCF_DLGBORDER
+    BEGIN
+        LTEXT         "Name:", -1, 8, 38, 30, 8
+        ENTRYFIELD    "", IDC_NAME, 42, 38, 128, 8, ES_MARGIN
+        DEFPUSHBUTTON "OK", DID_OK, 40, 8, 44, 14
+        PUSHBUTTON    "Cancel", DID_CANCEL, 96, 8, 44, 14
+    END
+END
+
+DLGTEMPLATE IDD_ABOUT
+BEGIN
+    DIALOG "About pmnotes", IDD_ABOUT, 20, 20, 160, 56, WS_VISIBLE,
+           FCF_TITLEBAR | FCF_SYSMENU | FCF_DLGBORDER
+    BEGIN
+        CTEXT         "Built with clang-retro", -1, 8, 34, 144, 8
+        DEFPUSHBUTTON "OK", DID_OK, 58, 8, 44, 14
+    END
+END
