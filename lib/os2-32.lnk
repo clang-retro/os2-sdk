@@ -690,6 +690,7 @@ import mmioGetData MMIO.106
 # MSG
 import DosInsertMessage MSG.4
 import DosPutMessage MSG.5
+import Dos32TrueGetMessage MSG.6
 # NLS
 import DosQueryCtryInfo NLS.5
 import DosQueryDBCSEnv NLS.6

@@ -1,0 +1,23 @@
+# Check the OS/2 headers: every declared function has an import in
+# lib/os2-*.lnk, and the headers compile (with the host's clang) with the
+# structure sizes the system expects.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  headers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/check-headers.py
+      - run: tools/check-syntax.sh clang

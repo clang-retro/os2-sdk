@@ -19,6 +19,12 @@ import os
 import re
 import sys
 
+# 32-bit entry points whose export names are upper case, and the names the
+# headers call them by.
+RENAME32 = {
+    "DOS32TRUEGETMESSAGE": "Dos32TrueGetMessage",
+}
+
 
 def main():
     bits, defdir = sys.argv[1], sys.argv[2]
@@ -41,7 +47,9 @@ def main():
                 if not m or lib is None:
                     continue
                 sym, ordinal = m.group(1), int(m.group(2))
-                if bits == "32" and not re.search(r"[a-z]", sym):
+                if bits == "32" and sym in RENAME32:
+                    sym = RENAME32[sym]
+                elif bits == "32" and not re.search(r"[a-z]", sym):
                     continue
                 if sym in seen:
                     continue

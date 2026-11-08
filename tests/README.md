@@ -8,6 +8,12 @@ output goes to B:\NAME.out, and mtools reads it back afterwards.
     ./mkwarp3.sh Disk00.img Disk01.img work   # Blue Spine floppy set
     ./runtests.sh work 60 hello.exe sysinfo.exe
 
+Files given that are not programs are copied to B: too; `dosapi.exe` reads
+XDF.MSG, which is on diskette 0:
+
+    mcopy -i Disk00.img ::/XDF.MSG .
+    ./runtests.sh work 60 dosapi.exe XDF.MSG
+
 Needs qemu-system-i386, mtools and python3. The last screen is saved as
 work/screen.ppm.
 

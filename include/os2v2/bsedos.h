@@ -6,6 +6,7 @@
 #define __BSEDOS_H
 
 #include <os2def.h>
+#include <bsexcpt.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,7 +50,9 @@ APIRET APIENTRY DosExitCritSec(VOID);
 #define EXLST_ADD    1
 #define EXLST_REMOVE 2
 #define EXLST_EXIT   3
-APIRET APIENTRY DosExitList(ULONG ordercode, PFN pfn);
+typedef VOID APIENTRY FNEXITLIST(ULONG);
+typedef FNEXITLIST *PFNEXITLIST;
+APIRET APIENTRY DosExitList(ULONG ordercode, PFNEXITLIST pfn);
 APIRET APIENTRY DosSetPriority(ULONG scope, ULONG ulClass, LONG delta, ULONG PorTid);
 
 typedef struct _TIB2 {
@@ -261,7 +264,6 @@ typedef struct _FTIME {
     USHORT minutes : 6;
     USHORT hours : 5;
 } FTIME, *PFTIME;
-#pragma pack(push, 1)
 typedef struct _FILESTATUS3 {
     FDATE fdateCreation;
     FTIME ftimeCreation;
@@ -287,7 +289,6 @@ typedef struct _FILEFINDBUF3 {
     UCHAR cchName;
     CHAR  achName[256];
 } FILEFINDBUF3, *PFILEFINDBUF3;
-#pragma pack(pop)
 #define FIL_STANDARD     1
 #define FIL_QUERYEASIZE  2
 #define FIL_QUERYFULLNAME 5
@@ -319,8 +320,534 @@ APIRET APIENTRY DosError(ULONG error);
 
 /* Messages (MSG.DLL) */
 APIRET APIENTRY DosPutMessage(HFILE hfile, ULONG cbMsg, PCHAR pBuf);
-APIRET APIENTRY DosGetMessage(PCHAR *pTable, ULONG cTable, PCHAR pBuf, ULONG cbBuf,
-                              ULONG msgnumber, PCSZ pszFile, PULONG pcbMsg);
+/* MSG.DLL's DosGetMessage takes, first, the program's table of messages
+   bound into it (by MSGBIND), and removes that one argument from the stack
+   itself when it returns. The toolkits' DosGetMessage is a stub that adds
+   the table; this one passes an empty table, so messages come from the
+   message file. */
+APIRET APIENTRY Dos32TrueGetMessage(PVOID pMsgSeg, PCHAR *pTable, ULONG cTable,
+                                    PCHAR pBuf, ULONG cbBuf, ULONG msgnumber,
+                                    PCSZ pszFile, PULONG pcbMsg);
+#pragma pack(push, 1)
+struct __os2_msgseg32 {
+    UCHAR  sig[14];
+    const USHORT *table;
+};
+#pragma pack(pop)
+static __inline__ APIRET DosGetMessage(PCHAR *pTable, ULONG cTable, PCHAR pBuf,
+                                       ULONG cbBuf, ULONG msgnumber, PCSZ pszFile,
+                                       PULONG pcbMsg)
+{
+    static const USHORT none[2] = { 0, 0xFFFF };
+    static const struct __os2_msgseg32 seg = {
+        { 0xFF, 'M', 'S', 'G', 'S', 'E', 'G', '3', '2', 0, 1, 0x80, 0, 0 },
+        none
+    };
+    const void *args[8] = { &seg, pTable, (void *)cTable, pBuf, (void *)cbBuf,
+                            (void *)msgnumber, pszFile, pcbMsg };
+    APIRET rc;
+    /* esi keeps the stack pointer across the call; the system preserves it. */
+    __asm__ volatile("movl %%esp, %%esi\n\t"
+                     "pushl 28(%1)\n\tpushl 24(%1)\n\tpushl 20(%1)\n\t"
+                     "pushl 16(%1)\n\tpushl 12(%1)\n\tpushl 8(%1)\n\t"
+                     "pushl 4(%1)\n\tpushl (%1)\n\t"
+                     "call Dos32TrueGetMessage\n\t"
+                     "movl %%esi, %%esp"
+                     : "=a"(rc)
+                     : "r"(args)
+                     : "ecx", "edx", "esi", "memory", "cc");
+    return rc;
+}
+
+/* Process and thread details */
+#define DKP_PROCESSTREE 0
+#define DKP_PROCESS     1
+
+#define PRTYS_PROCESS     0
+#define PRTYS_PROCESSTREE 1
+#define PRTYS_THREAD      2
+#define PRTYC_NOCHANGE         0
+#define PRTYC_IDLETIME         1
+#define PRTYC_REGULAR          2
+#define PRTYC_TIMECRITICAL     3
+#define PRTYC_FOREGROUNDSERVER 4
+#define PRTYD_MINIMUM (-31)
+#define PRTYD_MAXIMUM 31
+
+#define SEARCH_PATH          0x0000
+#define SEARCH_CUR_DIRECTORY 0x0001
+#define SEARCH_ENVIRONMENT   0x0002
+#define SEARCH_IGNORENETERRS 0x0004
+
+/* DosQuerySysInfo items of later versions: Warp 3 SMP and Warp 4.5. */
+#define QSV_NUMPROCESSORS        26
+#define QSV_MAXHPRMEM            27
+#define QSV_MAXHSHMEM            28
+#define QSV_MAXPROCESSES         29
+#define QSV_VIRTUALADDRESSLIMIT  30
+
+/* What kind of program or DLL a file is (DosQueryAppType). */
+#define FAPPTYP_NOTSPEC         0x0000
+#define FAPPTYP_NOTWINDOWCOMPAT 0x0001
+#define FAPPTYP_WINDOWCOMPAT    0x0002
+#define FAPPTYP_WINDOWAPI       0x0003
+#define FAPPTYP_BOUND           0x0008
+#define FAPPTYP_DLL             0x0010
+#define FAPPTYP_DOS             0x0020
+#define FAPPTYP_PHYSDRV         0x0040
+#define FAPPTYP_VIRTDRV         0x0080
+#define FAPPTYP_PROTDLL         0x0100
+#define FAPPTYP_WINDOWSREAL     0x0200
+#define FAPPTYP_WINDOWSPROT     0x0400
+#define FAPPTYP_WINDOWSPROT31   0x1000
+#define FAPPTYP_32BIT           0x4000
+#define FAPPTYP_EXETYPE         FAPPTYP_WINDOWAPI
+APIRET APIENTRY DosQueryAppType(PCSZ pszName, PULONG pFlags);
+
+APIRET APIENTRY DosEnterMustComplete(PULONG pulNesting);
+APIRET APIENTRY DosExitMustComplete(PULONG pulNesting);
+
+/* Thread-local memory: cb is a count of ULONGs, at most 8. */
+APIRET APIENTRY DosAllocThreadLocalMemory(ULONG cb, PULONG *p);
+APIRET APIENTRY DosFreeThreadLocalMemory(PULONG p);
+
+/* High memory, above 512 MiB, where the system has it (Warp 4.5). */
+#define OBJ_ANY 0x0400
+
+/* Modules and resources */
+#define PT_16BIT 0
+#define PT_32BIT 1
+APIRET APIENTRY DosQueryProcType(HMODULE hmod, ULONG ordinal, PCSZ pszName,
+                                 PULONG pulproctype);
+APIRET APIENTRY DosGetResource(HMODULE hmod, ULONG idType, ULONG idName, PPVOID ppb);
+APIRET APIENTRY DosFreeResource(PVOID pb);
+APIRET APIENTRY DosQueryResourceSize(HMODULE hmod, ULONG idt, ULONG idn, PULONG pulsize);
+
+/* The LIBPATH of the process, before and after the system's (Warp 3 and
+   later). */
+#define BEGIN_LIBPATH 1
+#define END_LIBPATH   2
+APIRET APIENTRY DosQueryExtLIBPATH(PSZ pszExtLIBPATH, ULONG flags);
+APIRET APIENTRY DosSetExtLIBPATH(PCSZ pszExtLIBPATH, ULONG flags);
+
+/* Timers */
+APIRET APIENTRY DosAsyncTimer(ULONG msec, HSEM hsem, PHTIMER phtimer);
+APIRET APIENTRY DosStartTimer(ULONG msec, HSEM hsem, PHTIMER phtimer);
+APIRET APIENTRY DosStopTimer(HTIMER htimer);
+APIRET APIENTRY DosTmrQueryFreq(PULONG pulTmrFreq);
+APIRET APIENTRY DosTmrQueryTime(PQWORD pqwTmrTime);
+
+/* Semaphores: mutexes and muxwait lists */
+APIRET APIENTRY DosQueryMutexSem(HMTX hmtx, PPID ppid, PTID ptid, PULONG pulCount);
+
+typedef struct _SEMRECORD {
+    HSEM  hsemCur;
+    ULONG ulUser;
+} SEMRECORD, *PSEMRECORD;
+#define DCMW_WAIT_ANY 0x0002
+#define DCMW_WAIT_ALL 0x0004
+APIRET APIENTRY DosCreateMuxWaitSem(PCSZ pszName, PHMUX phmux, ULONG cSemRec,
+                                    PSEMRECORD pSemRec, ULONG flAttr);
+APIRET APIENTRY DosOpenMuxWaitSem(PCSZ pszName, PHMUX phmux);
+APIRET APIENTRY DosCloseMuxWaitSem(HMUX hmux);
+APIRET APIENTRY DosWaitMuxWaitSem(HMUX hmux, ULONG ulTimeout, PULONG pulUser);
+APIRET APIENTRY DosAddMuxWaitSem(HMUX hmux, PSEMRECORD pSemRec);
+APIRET APIENTRY DosDeleteMuxWaitSem(HMUX hmux, HSEM hSem);
+APIRET APIENTRY DosQueryMuxWaitSem(HMUX hmux, PULONG pcSemRec, PSEMRECORD pSemRec,
+                                   PULONG pflAttr);
+
+/* Queues (QUECALLS) */
+#define QUE_FIFO              0
+#define QUE_LIFO              1
+#define QUE_PRIORITY          2
+#define QUE_NOCONVERT_ADDRESS 0
+#define QUE_CONVERT_ADDRESS   4
+typedef struct _REQUESTDATA {
+    PID   pid;
+    ULONG ulData;
+} REQUESTDATA, *PREQUESTDATA;
+APIRET APIENTRY DosCreateQueue(PHQUEUE phq, ULONG priority, PCSZ pszName);
+APIRET APIENTRY DosOpenQueue(PPID ppid, PHQUEUE phq, PCSZ pszName);
+APIRET APIENTRY DosCloseQueue(HQUEUE hq);
+APIRET APIENTRY DosWriteQueue(HQUEUE hq, ULONG request, ULONG cbData, PVOID pbData,
+                              ULONG priority);
+APIRET APIENTRY DosReadQueue(HQUEUE hq, PREQUESTDATA pRequest, PULONG pcbData,
+                             PPVOID ppbuf, ULONG element, BOOL32 wait,
+                             PBYTE ppriority, HEV hsem);
+APIRET APIENTRY DosPeekQueue(HQUEUE hq, PREQUESTDATA pRequest, PULONG pcbData,
+                             PPVOID ppbuf, PULONG element, BOOL32 nowait,
+                             PBYTE ppriority, HEV hsem);
+APIRET APIENTRY DosPurgeQueue(HQUEUE hq);
+APIRET APIENTRY DosQueryQueue(HQUEUE hq, PULONG pcbEntries);
+
+/* Named pipes */
+#define NP_ACCESS_INBOUND  0x0000
+#define NP_ACCESS_OUTBOUND 0x0001
+#define NP_ACCESS_DUPLEX   0x0002
+#define NP_INHERIT         0x0000
+#define NP_NOINHERIT       0x0080
+#define NP_WRITEBEHIND     0x0000
+#define NP_NOWRITEBEHIND   0x4000
+#define NP_READMODE_BYTE    0x0000
+#define NP_READMODE_MESSAGE 0x0100
+#define NP_TYPE_BYTE        0x0000
+#define NP_TYPE_MESSAGE     0x0400
+#define NP_END_CLIENT       0x0000
+#define NP_END_SERVER       0x4000
+#define NP_WAIT             0x0000
+#define NP_NOWAIT           0x8000
+#define NP_UNLIMITED_INSTANCES 0x00FF
+#define NP_STATE_DISCONNECTED 1
+#define NP_STATE_LISTENING    2
+#define NP_STATE_CONNECTED    3
+#define NP_STATE_CLOSING      4
+#define NP_INDEFINITE_WAIT    ((ULONG)-1)
+#define NP_DEFAULT_WAIT       0
+typedef struct _AVAILDATA {
+    USHORT cbpipe;
+    USHORT cbmessage;
+} AVAILDATA, *PAVAILDATA;
+APIRET APIENTRY DosCreateNPipe(PCSZ pszName, PHPIPE pHpipe, ULONG openmode,
+                               ULONG pipemode, ULONG cbOutbuf, ULONG cbInbuf,
+                               ULONG msec);
+APIRET APIENTRY DosConnectNPipe(HPIPE hpipe);
+APIRET APIENTRY DosDisConnectNPipe(HPIPE hpipe);
+APIRET APIENTRY DosPeekNPipe(HPIPE hpipe, PVOID pBuf, ULONG cbBuf, PULONG pcbActual,
+                             PAVAILDATA pAvail, PULONG pState);
+APIRET APIENTRY DosQueryNPHState(HPIPE hpipe, PULONG pState);
+APIRET APIENTRY DosSetNPHState(HPIPE hpipe, ULONG state);
+APIRET APIENTRY DosQueryNPipeInfo(HPIPE hpipe, ULONG infolevel, PVOID pBuf, ULONG cbBuf);
+APIRET APIENTRY DosTransactNPipe(HPIPE hpipe, PVOID pOutbuf, ULONG cbOut, PVOID pInbuf,
+                                 ULONG cbIn, PULONG pcbRead);
+APIRET APIENTRY DosCallNPipe(PCSZ pszName, PVOID pInbuf, ULONG cbIn, PVOID pOutbuf,
+                             ULONG cbOut, PULONG pcbActual, ULONG msec);
+APIRET APIENTRY DosWaitNPipe(PCSZ pszName, ULONG msec);
+APIRET APIENTRY DosSetNPipeSem(HPIPE hpipe, HSEM hsem, ULONG key);
+
+/* Sessions (SESMGR) */
+#define SSF_RELATED_INDEPENDENT 0
+#define SSF_RELATED_CHILD       1
+#define SSF_FGBG_FORE           0
+#define SSF_FGBG_BACK           1
+#define SSF_TRACEOPT_NONE       0
+#define SSF_TRACEOPT_TRACE      1
+#define SSF_TRACEOPT_TRACEALL   2
+#define SSF_INHERTOPT_SHELL     0
+#define SSF_INHERTOPT_PARENT    1
+#define SSF_TYPE_DEFAULT        0
+#define SSF_TYPE_FULLSCREEN     1
+#define SSF_TYPE_WINDOWABLEVIO  2
+#define SSF_TYPE_PM             3
+#define SSF_TYPE_VDM            4
+#define SSF_TYPE_GROUP          5
+#define SSF_TYPE_DLL            6
+#define SSF_TYPE_WINDOWEDVDM    7
+#define SSF_TYPE_PDD            8
+#define SSF_TYPE_VDD            9
+#define SSF_CONTROL_VISIBLE     0x0000
+#define SSF_CONTROL_INVISIBLE   0x0001
+#define SSF_CONTROL_MAXIMIZE    0x0002
+#define SSF_CONTROL_MINIMIZE    0x0004
+#define SSF_CONTROL_NOAUTOCLOSE 0x0008
+#define SSF_CONTROL_SETPOS      0x8000
+#define STOP_SESSION_SPECIFIED  0
+#define STOP_SESSION_ALL        1
+#define SET_SESSION_UNCHANGED   0
+#define SET_SESSION_SELECTABLE  1
+#define SET_SESSION_NON_SELECTABLE 2
+#define SET_SESSION_BOND        1
+#define SET_SESSION_NO_BOND     2
+typedef struct _STARTDATA {
+    USHORT Length;
+    USHORT Related;
+    USHORT FgBg;
+    USHORT TraceOpt;
+    PSZ    PgmTitle;
+    PSZ    PgmName;
+    PBYTE  PgmInputs;
+    PBYTE  TermQ;
+    PBYTE  Environment;
+    USHORT InheritOpt;
+    USHORT SessionType;
+    PSZ    IconFile;
+    ULONG  PgmHandle;
+    USHORT PgmControl;
+    USHORT InitXPos;
+    USHORT InitYPos;
+    USHORT InitXSize;
+    USHORT InitYSize;
+    USHORT Reserved;
+    PSZ    ObjectBuffer;
+    ULONG  ObjectBuffLen;
+} STARTDATA, *PSTARTDATA;
+typedef struct _STATUSDATA {
+    USHORT Length;
+    USHORT SelectInd;
+    USHORT BondInd;
+} STATUSDATA, *PSTATUSDATA;
+APIRET APIENTRY DosStartSession(PSTARTDATA psd, PULONG pidSession, PPID ppid);
+APIRET APIENTRY DosSelectSession(ULONG idSession);
+APIRET APIENTRY DosSetSession(ULONG idSession, PSTATUSDATA psd);
+APIRET APIENTRY DosStopSession(ULONG scope, ULONG idSession);
+
+/* Exceptions and signals; the structures are in bsexcpt.h. */
+APIRET APIENTRY DosSetExceptionHandler(PEXCEPTIONREGISTRATIONRECORD pERegRec);
+APIRET APIENTRY DosUnsetExceptionHandler(PEXCEPTIONREGISTRATIONRECORD pERegRec);
+APIRET APIENTRY DosRaiseException(PEXCEPTIONREPORTRECORD pexcept);
+APIRET APIENTRY DosUnwindException(PEXCEPTIONREGISTRATIONRECORD phandler,
+                                   PVOID pTargetIP, PEXCEPTIONREPORTRECORD pERepRec);
+APIRET APIENTRY DosSetSignalExceptionFocus(BOOL32 flag, PULONG pulTimes);
+APIRET APIENTRY DosSendSignalException(PID pid, ULONG exception);
+APIRET APIENTRY DosAcknowledgeSignalException(ULONG ulSignalNum);
+APIRET APIENTRY DosQueryThreadContext(TID tid, ULONG level, PCONTEXTRECORD pcxt);
+
+/* National language support (NLS, the 32-bit Dos*Ctry* and code page
+   calls) */
+typedef struct _COUNTRYCODE {
+    ULONG country;
+    ULONG codepage;
+} COUNTRYCODE, *PCOUNTRYCODE;
+typedef struct _COUNTRYINFO {
+    ULONG  country;
+    ULONG  codepage;
+    ULONG  fsDateFmt;
+    CHAR   szCurrency[5];
+    CHAR   szThousandsSeparator[2];
+    CHAR   szDecimal[2];
+    CHAR   szDateSeparator[2];
+    CHAR   szTimeSeparator[2];
+    UCHAR  fsCurrencyFmt;
+    UCHAR  cDecimalPlace;
+    UCHAR  fsTimeFmt;
+    USHORT abReserved1[2];
+    CHAR   szDataSeparator[2];
+    USHORT abReserved2[5];
+} COUNTRYINFO, *PCOUNTRYINFO;
+APIRET APIENTRY DosQueryCtryInfo(ULONG cb, PCOUNTRYCODE pcc, PCOUNTRYINFO pci,
+                                 PULONG pcbActual);
+APIRET APIENTRY DosQueryDBCSEnv(ULONG cb, PCOUNTRYCODE pcc, PCHAR pBuf);
+APIRET APIENTRY DosMapCase(ULONG cb, PCOUNTRYCODE pcc, PCHAR pch);
+APIRET APIENTRY DosQueryCollate(ULONG cb, PCOUNTRYCODE pcc, PCHAR pch, PULONG pcch);
+APIRET APIENTRY DosQueryCp(ULONG cb, PULONG arCP, PULONG pcCP);
+APIRET APIENTRY DosSetProcessCp(ULONG cp);
+
+/* Messages */
+APIRET APIENTRY DosInsertMessage(PCHAR *pTable, ULONG cTable, PCSZ pszMsg, ULONG cbMsg,
+                                 PCHAR pBuf, ULONG cbBuf, PULONG pcbMsg);
+
+/* Extended attributes */
+#define FEA_NEEDEA 0x80
+#define EAT_BINARY   0xFFFE
+#define EAT_ASCII    0xFFFD
+#define EAT_BITMAP   0xFFFB
+#define EAT_METAFILE 0xFFFA
+#define EAT_ICON     0xFFF9
+#define EAT_EA       0xFFEE
+#define EAT_MVMT     0xFFDF
+#define EAT_MVST     0xFFDE
+#define EAT_ASN1     0xFFDD
+typedef struct _GEA2 {
+    ULONG oNextEntryOffset;
+    BYTE  cbName;
+    CHAR  szName[1];
+} GEA2, *PGEA2;
+typedef struct _GEA2LIST {
+    ULONG cbList;
+    GEA2  list[1];
+} GEA2LIST, *PGEA2LIST;
+typedef struct _FEA2 {
+    ULONG  oNextEntryOffset;
+    BYTE   fEA;
+    BYTE   cbName;
+    USHORT cbValue;
+    CHAR   szName[1];
+} FEA2, *PFEA2;
+typedef struct _FEA2LIST {
+    ULONG cbList;
+    FEA2  list[1];
+} FEA2LIST, *PFEA2LIST;
+typedef struct _EAOP2 {
+    PGEA2LIST fpGEA2List;
+    PFEA2LIST fpFEA2List;
+    ULONG     oError;
+} EAOP2;
+typedef FEA2 DENA2, *PDENA2;
+#define ENUMEA_LEVEL_NO_VALUE   1
+#define ENUMEA_REFTYPE_FHANDLE  0
+#define ENUMEA_REFTYPE_PATH     1
+#define ENUMEA_REFTYPE_MAX      ENUMEA_REFTYPE_PATH
+APIRET APIENTRY DosEnumAttribute(ULONG ulRefType, PVOID pvFile, ULONG ulEntry,
+                                 PVOID pvBuf, ULONG cbBuf, PULONG pulCount,
+                                 ULONG ulInfoLevel);
+
+/* FIL_QUERYEASIZE: FILESTATUS3 with the size of the file's EAs. */
+typedef struct _FILESTATUS4 {
+    FDATE fdateCreation;
+    FTIME ftimeCreation;
+    FDATE fdateLastAccess;
+    FTIME ftimeLastAccess;
+    FDATE fdateLastWrite;
+    FTIME ftimeLastWrite;
+    ULONG cbFile;
+    ULONG cbFileAlloc;
+    ULONG attrFile;
+    ULONG cbList;
+} FILESTATUS4, *PFILESTATUS4;
+typedef struct _FILEFINDBUF4 {
+    ULONG oNextEntryOffset;
+    FDATE fdateCreation;
+    FTIME ftimeCreation;
+    FDATE fdateLastAccess;
+    FTIME ftimeLastAccess;
+    FDATE fdateLastWrite;
+    FTIME ftimeLastWrite;
+    ULONG cbFile;
+    ULONG cbFileAlloc;
+    ULONG attrFile;
+    ULONG cbList;
+    UCHAR cchName;
+    CHAR  achName[256];
+} FILEFINDBUF4, *PFILEFINDBUF4;
+#define FIL_QUERYEASFROMLIST 3
+
+/* More file calls */
+#define MUST_HAVE_READONLY  ((FILE_READONLY << 8) | FILE_READONLY)
+#define MUST_HAVE_HIDDEN    ((FILE_HIDDEN << 8) | FILE_HIDDEN)
+#define MUST_HAVE_SYSTEM    ((FILE_SYSTEM << 8) | FILE_SYSTEM)
+#define MUST_HAVE_DIRECTORY ((FILE_DIRECTORY << 8) | FILE_DIRECTORY)
+#define MUST_HAVE_ARCHIVED  ((FILE_ARCHIVED << 8) | FILE_ARCHIVED)
+#define OPEN_FLAGS_NO_LOCALITY  0x0000
+#define OPEN_FLAGS_SEQUENTIAL   0x0100
+#define OPEN_FLAGS_RANDOM       0x0200
+#define OPEN_FLAGS_RANDOMSEQUENTIAL 0x0300
+#define OPEN_FLAGS_NO_CACHE     0x1000
+typedef struct _FILELOCK {
+    LONG lOffset;
+    LONG lRange;
+} FILELOCK, *PFILELOCK;
+APIRET APIENTRY DosSetFileLocks(HFILE hFile, PFILELOCK pflUnlock, PFILELOCK pflLock,
+                                ULONG timeout, ULONG flags);
+APIRET APIENTRY DosForceDelete(PCSZ pszFile);
+APIRET APIENTRY DosEditName(ULONG metalevel, PCSZ pszSource, PCSZ pszEdit,
+                            PBYTE pszTarget, ULONG cbTarget);
+APIRET APIENTRY DosQueryVerify(PBOOL32 pBool);
+APIRET APIENTRY DosSetVerify(BOOL32 fVerify);
+APIRET APIENTRY DosSetRelMaxFH(PLONG pcbReqCount, PULONG pcbCurMaxFH);
+APIRET APIENTRY DosShutdown(ULONG ulReserved);
+
+/* Files over 2 GiB (Warp Server for e-business, Warp 4.5 kernels and
+   later): a program that calls these does not load on earlier
+   versions. */
+typedef long long LONGLONG, *PLONGLONG;
+#define FIL_STANDARDL     11
+#define FIL_QUERYEASIZEL  12
+#define FIL_QUERYEASFROMLISTL 13
+#pragma pack(push, 1)
+typedef struct _FILESTATUS3L {
+    FDATE    fdateCreation;
+    FTIME    ftimeCreation;
+    FDATE    fdateLastAccess;
+    FTIME    ftimeLastAccess;
+    FDATE    fdateLastWrite;
+    FTIME    ftimeLastWrite;
+    LONGLONG cbFile;
+    LONGLONG cbFileAlloc;
+    ULONG    attrFile;
+} FILESTATUS3L, *PFILESTATUS3L;
+typedef struct _FILEFINDBUF3L {
+    ULONG    oNextEntryOffset;
+    FDATE    fdateCreation;
+    FTIME    ftimeCreation;
+    FDATE    fdateLastAccess;
+    FTIME    ftimeLastAccess;
+    FDATE    fdateLastWrite;
+    FTIME    ftimeLastWrite;
+    LONGLONG cbFile;
+    LONGLONG cbFileAlloc;
+    ULONG    attrFile;
+    UCHAR    cchName;
+    CHAR     achName[256];
+} FILEFINDBUF3L, *PFILEFINDBUF3L;
+typedef struct _FILELOCKL {
+    LONGLONG lOffset;
+    LONGLONG lRange;
+} FILELOCKL, *PFILELOCKL;
+#pragma pack(pop)
+APIRET APIENTRY DosOpenL(PCSZ pszFileName, PHFILE pHf, PULONG pulAction,
+                         LONGLONG cbFile, ULONG ulAttribute, ULONG fsOpenFlags,
+                         ULONG fsOpenMode, PEAOP2 peaop2);
+APIRET APIENTRY DosSetFilePtrL(HFILE hFile, LONGLONG ib, ULONG method,
+                               PLONGLONG ibActual);
+APIRET APIENTRY DosSetFileSizeL(HFILE hFile, LONGLONG cbSize);
+APIRET APIENTRY DosSetFileLocksL(HFILE hFile, PFILELOCKL pflUnlock,
+                                 PFILELOCKL pflLock, ULONG timeout, ULONG flags);
+
+/* File systems and disks */
+#define FSIL_ALLOC  1
+#define FSIL_VOLSER 2
+typedef struct _FSALLOCATE {
+    ULONG  idFileSystem;
+    ULONG  cSectorUnit;
+    ULONG  cUnit;
+    ULONG  cUnitAvail;
+    USHORT cbSector;
+} FSALLOCATE, *PFSALLOCATE;
+#pragma pack(push, 1)
+typedef struct _VOLUMELABEL {
+    BYTE cch;
+    CHAR szVolLabel[12];
+} VOLUMELABEL, *PVOLUMELABEL;
+#pragma pack(pop)
+typedef struct _FSINFO {
+    FDATE       fdateCreation;   /* the volume serial number, as two halves */
+    FTIME       ftimeCreation;
+    VOLUMELABEL vol;
+} FSINFO, *PFSINFO;
+APIRET APIENTRY DosQueryFSInfo(ULONG disknum, ULONG infolevel, PVOID pBuf, ULONG cbBuf);
+APIRET APIENTRY DosSetFSInfo(ULONG disknum, ULONG infolevel, PVOID pBuf, ULONG cbBuf);
+
+#define FSAIL_QUERYNAME 1
+#define FSAIL_DEVNUMBER 2
+#define FSAIL_DRVNUMBER 3
+#define FSAT_CHARDEV   1
+#define FSAT_PSEUDODEV 2
+#define FSAT_LOCALDRV  3
+#define FSAT_REMOTEDRV 4
+#define FS_ATTACH        0
+#define FS_DETACH        1
+#define FS_SPOOLATTACH   2
+#define FS_SPOOLDETACH   3
+typedef struct _FSQBUFFER2 {
+    USHORT iType;
+    USHORT cbName;
+    USHORT cbFSDName;
+    USHORT cbFSAData;
+    UCHAR  szName[1];
+    UCHAR  szFSDName[1];
+    UCHAR  rgFSAData[1];
+} FSQBUFFER2, *PFSQBUFFER2;
+APIRET APIENTRY DosQueryFSAttach(PCSZ pszDeviceName, ULONG ulOrdinal,
+                                 ULONG ulFSAInfoLevel, PFSQBUFFER2 pfsqb,
+                                 PULONG pcbBuffLength);
+APIRET APIENTRY DosFSAttach(PCSZ pszDevice, PCSZ pszFilesystem, PVOID pData,
+                            ULONG cbData, ULONG flag);
+APIRET APIENTRY DosFSCtl(PVOID pData, ULONG cbData, PULONG pcbData, PVOID pParms,
+                         ULONG cbParms, PULONG pcbParms, ULONG function,
+                         PCSZ pszRoute, HFILE hFile, ULONG method);
+
+#define INFO_COUNT_PARTITIONABLE_DISKS 1
+#define INFO_GETIOCTLHANDLE            2
+#define INFO_FREEIOCTLHANDLE           3
+APIRET APIENTRY DosPhysicalDisk(ULONG function, PVOID pBuf, ULONG cbBuf, PVOID pParams,
+                                ULONG cbParams);
+
+#define DEVINFO_PRINTER     0
+#define DEVINFO_RS232       1
+#define DEVINFO_FLOPPY      2
+#define DEVINFO_COPROCESSOR 3
+#define DEVINFO_SUBMODEL    4
+#define DEVINFO_MODEL       5
+#define DEVINFO_ADAPTER     6
 
 #ifdef __cplusplus
 }

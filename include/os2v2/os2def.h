@@ -79,6 +79,12 @@ typedef VOID          *MPARAM, **PMPARAM;
 typedef VOID          *MRESULT, **PMRESULT;
 typedef LONG           COLOR, *PCOLOR;
 typedef ULONG          ERRORID;
+typedef VOID          *HSEM, **PHSEM;
+typedef LHANDLE        HTIMER, *PHTIMER;
+typedef struct _QWORD {
+    ULONG ulLo;
+    ULONG ulHi;
+} QWORD, *PQWORD;
 
 #define MAKEULONG(l, h)  ((ULONG)(((USHORT)(l)) | ((ULONG)((USHORT)(h))) << 16))
 #define MAKELONG(l, h)   ((LONG)MAKEULONG(l, h))

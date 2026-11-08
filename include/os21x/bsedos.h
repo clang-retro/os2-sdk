@@ -279,9 +279,23 @@ USHORT APIENTRY DosError(USHORT fEnable);
 
 /* Messages (MSG.DLL) */
 USHORT APIENTRY DosPutMessage(HFILE hf, USHORT cbMsg, PCHAR pchMsg);
-USHORT APIENTRY DosGetMessage(PCHAR FAR *ppchVTable, USHORT usVCount, PCHAR pchBuf,
-                              USHORT cbBuf, USHORT usMsgNum, PSZ pszFileName,
-                              PUSHORT pcbMsg);
+/* MSG.DLL's DosGetMessage takes, last, the program's table of messages
+   bound into it (by MSGBIND). The toolkits' DosGetMessage is a stub that
+   passes it; this one passes an empty table, so messages come from the
+   message file. */
+USHORT APIENTRY DosTrueGetMessage(PCHAR FAR *ppchVTable, USHORT usVCount,
+                                  PCHAR pchBuf, USHORT cbBuf, USHORT usMsgNum,
+                                  PSZ pszFileName, PUSHORT pcbMsg, PVOID pMsgSeg);
+static __inline__ USHORT DosGetMessage(PCHAR FAR *ppchVTable, USHORT usVCount,
+                                       PCHAR pchBuf, USHORT cbBuf, USHORT usMsgNum,
+                                       PSZ pszFileName, PUSHORT pcbMsg)
+{
+    static const UCHAR seg[18] = {
+        0xFF, 'M', 'K', 'M', 'S', 'G', 'S', 'E', 'G', 0, 1, 0, 0, 0, 0, 0
+    };
+    return DosTrueGetMessage(ppchVTable, usVCount, pchBuf, cbBuf, usMsgNum,
+                             pszFileName, pcbMsg, (PVOID)seg);
+}
 
 #ifdef __cplusplus
 }
