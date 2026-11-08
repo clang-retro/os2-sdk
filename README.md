@@ -146,7 +146,9 @@ runs `COMSPEC` (or `CMD.EXE` from the `PATH`) with `/c`, and
 program's exit code, and `P_NOWAIT` its process id, which `waitpid` and
 `wait` wait for. `exec` starts the program and exits with its exit code.
 A name without an extension gets `.EXE`, and the `p` forms search the
-current directory and then the `PATH`. `popen` is not there yet.
+current directory and then the `PATH`. `pipe`, `dup` and `dup2` work on
+OS/2's handles, and `popen` runs the command with this program's end of
+the pipe kept from it, so `pclose` gives it the end of its input.
 
 ## Testing
 
@@ -158,7 +160,7 @@ semaphores, queues, named pipes, timers, NLS, file systems, messages and
 extended attributes), `tests/restest.c` reads back the resources
 `os2rc.py` bound into it with `DosGetResource` (16 and 32-bit), `tests/posix.c` tries
 the directory calls of the C library, `tests/spawn.c` starts itself with
-`spawn`, `exec` and `system` (16 and 32-bit), and `tests/vio.c` the Vio, Kbd and
+`spawn`, `exec`, `system` and `popen` and tries `pipe` (16 and 32-bit), and `tests/vio.c` the Vio, Kbd and
 Mou calls from 32-bit code. `tests/testdll.c` is a 16-bit DLL that uses
 the C library and `tests/dllapp.c` a program that calls it, and starts
 itself again to check that the DLL's data is per process. All pass on
@@ -171,7 +173,6 @@ diskettes have no Presentation Manager, so PM programs are only built.
   one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39
   common ones, and a call is added with a line in `tools/gen-bsesub.py`.
-- `popen` and `pipe` in the C library.
 - C++ (libc++), threads in the C library.
 
 ## License

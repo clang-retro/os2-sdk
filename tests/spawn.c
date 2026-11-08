@@ -1,7 +1,9 @@
 /*
- * spawn.c - system, spawn, exec and waitpid. The program starts itself
- * again: "spawn child CODE ARGS..." checks its arguments and exits with
- * CODE, and "spawn exec CODE" execs a child that exits with CODE.
+ * spawn.c - system, spawn, exec, waitpid, pipe, dup and popen. The
+ * program starts itself again: "spawn child CODE ARGS..." checks its
+ * arguments and exits with CODE, "spawn exec CODE" execs a child that
+ * exits with CODE, "spawn echo" writes a line and "spawn read" exits with
+ * 42 when it reads "hello".
  *
  * Copyright (C) clang-retro contributors.
  * SPDX-License-Identifier: AGPL-3.0-only
@@ -42,6 +44,14 @@ main(int argc, char **argv)
         }
         return code;
     }
+    if (argc == 2 && strcmp(argv[1], "echo") == 0) {
+        printf("from the child\n");
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "read") == 0) {
+        char line[40];
+        return fgets(line, sizeof(line), stdin) && strncmp(line, "hello", 5) == 0 ? 42 : 103;
+    }
     if (argc == 3 && strcmp(argv[1], "exec") == 0) {
         execl(self, self, "child", argv[2], (char *)NULL);
         return 102;
@@ -76,6 +86,28 @@ main(int argc, char **argv)
     snprintf(cmd, sizeof(cmd), "%s child 4", self);
     status = system(cmd);
     check("system", WIFEXITED(status) && WEXITSTATUS(status) == 4);
+
+    int  fds[2];
+    char buf[16] = "";
+    check("pipe", pipe(fds) == 0 && write(fds[1], "abc", 3) == 3 && close(fds[1]) == 0 &&
+                      read(fds[0], buf, sizeof(buf)) == 3 && memcmp(buf, "abc", 3) == 0 &&
+                      read(fds[0], buf, sizeof(buf)) == 0 && close(fds[0]) == 0);
+    int d = dup(1);
+    check("dup, dup2", d > 2 && dup2(d, 9) == 9 && write(9, "", 0) == 0 && close(9) == 0 &&
+                           close(d) == 0);
+
+    snprintf(cmd, sizeof(cmd), "%s echo", self);
+    FILE *f = popen(cmd, "r");
+    char  line[40] = "";
+    check("popen \"r\"", f && fgets(line, sizeof(line), f) &&
+                             strncmp(line, "from the child", 14) == 0);
+    status = f ? pclose(f) : -1;
+    check("pclose", WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    snprintf(cmd, sizeof(cmd), "%s read", self);
+    f = popen(cmd, "w");
+    check("popen \"w\"", f && fputs("hello\n", f) >= 0);
+    status = f ? pclose(f) : -1;
+    check("pclose, exit code", WIFEXITED(status) && WEXITSTATUS(status) == 42);
 
     printf("%d failed\n", failed);
     return failed;
