@@ -41,7 +41,7 @@ typedef unsigned long  BOOL;
 typedef unsigned short SEL;
 
 typedef CHAR          *PCHAR, *PCH, *PSZ;
-typedef const CHAR    *PCSZ;
+typedef const CHAR    *PCSZ, *PCCH;
 typedef UCHAR         *PUCHAR;
 typedef BYTE          *PBYTE;
 typedef SHORT         *PSHORT;

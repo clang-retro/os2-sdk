@@ -12,12 +12,16 @@ DEFDIR holds .def files of the OS/2 system DLLs, one per DLL:
 
 as Open Watcom's bld/os2api/lib286 (OS/2 1.x) and lib386 (OS/2 2.x) have.
 Each export becomes "import NAME DLL.ORDINAL". The 32-bit list leaves out
-the 16-bit entry points (all upper case, such as DOS16WRITE or VIOWRTTTY),
-which 32-bit code cannot call directly.
+the 16-bit entry points (all upper case, such as DOS16WRITE), which 32-bit
+code cannot call directly, except those of VIOCALLS, KBDCALLS and
+MOUCALLS (VIO16WRTTTY ...): the 16-bit stubs of bsesub.h call them.
 """
 import os
 import re
 import sys
+
+# DLLs whose 16-bit entry points the 32-bit list keeps.
+KEEP16 = {"VIOCALLS", "KBDCALLS", "MOUCALLS"}
 
 # 32-bit entry points whose export names are upper case, and the names the
 # headers call them by.
@@ -49,7 +53,7 @@ def main():
                 sym, ordinal = m.group(1), int(m.group(2))
                 if bits == "32" and sym in RENAME32:
                     sym = RENAME32[sym]
-                elif bits == "32" and not re.search(r"[a-z]", sym):
+                elif bits == "32" and not re.search(r"[a-z]", sym) and lib not in KEEP16:
                     continue
                 if sym in seen:
                     continue

@@ -21,6 +21,10 @@ jobs:
           persist-credentials: false
       - run: python3 tools/check-headers.py
       - run: tools/check-syntax.sh clang
+      # bsesub.h is what gen-bsesub.py writes, and its stubs can be made.
+      - run: |
+          python3 tools/gen-bsesub.py | diff -u include/os2v2/bsesub.h -
+          python3 tools/gen-bsesub.py --stubs "$RUNNER_TEMP/stubs"
       # The resource compiler compiles the example and test resources.
       - run: |
           python3 tools/os2rc.py -I include/os2v2 -r examples/pmnotes.rc "$RUNNER_TEMP/pmnotes.res"

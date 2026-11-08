@@ -34,6 +34,9 @@ SIZE(FATTRS, 56);
 SIZE(FONTMETRICS, 228); /* with the Warp fields: atoms and PANOSE */
 SIZE(BITMAPINFOHEADER2, 64);
 SIZE(SWCNTRL, 96);
+SIZE(VIOMODEINFO, 14); /* the 16-bit structures of bsesub.h */
+SIZE(KBDKEYINFO, 10);
+SIZE(MOUEVENTINFO, 10);
 #endif
 
 int main(void) { return 0; }

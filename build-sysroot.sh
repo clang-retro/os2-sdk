@@ -4,7 +4,7 @@
 #   build-sysroot.sh 32 OUT    the i386-os2 sysroot (32-bit OS/2 2.x and
 #                              later): include/ (picolibc and the OS/2 API),
 #                              lib/crt0.o, libc.a, libm.a,
-#                              libclang_rt.builtins.a and os2.lnk
+#                              libclang_rt.builtins.a, libos2.a and os2.lnk
 #   build-sysroot.sh 16 SYSROOT
 #                              the 16-bit OS/2 1.x libraries, into an
 #                              i8086-msdos sysroot that dos-sdk built:
@@ -73,6 +73,15 @@ case $bits in
      "$out/lib/libclang_rt.builtins.a"
   cp "$here"/include/os2v2/*.h "$out/include/"
   cp "$here/lib/os2-32.lnk" "$out/lib/os2.lnk"
+  # libos2.a: the thunk into the 16-bit Vio, Kbd and Mou calls (bsesub.h),
+  # and a 16-bit stub, an OMF object, for each of them.
+  rm -rf "$WORK/libos2" "$out/lib/libos2.a"
+  mkdir -p "$WORK/libos2"
+  "$BIN/clang" --target=i386-pc-os2 -march=i386 -Os -Wall -Werror \
+    --sysroot="$out" -c "$here/lib/call16.c" -o "$WORK/libos2/call16.o"
+  python3 "$here/tools/gen-bsesub.py" --stubs "$WORK/libos2/stubs"
+  "$BIN/llvm-ar" rcs "$out/lib/libos2.a" "$WORK/libos2/call16.o" \
+    "$WORK/libos2/stubs/"*.obj
   ;;
 16)
   DOS_SDK=${DOS_SDK:-$here/../dos-sdk}
