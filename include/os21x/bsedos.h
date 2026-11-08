@@ -123,6 +123,32 @@ USHORT APIENTRY DosGetProcAddr(HMODULE hmod, PSZ pszProcName, PPFN ppfnProcAddr)
 USHORT APIENTRY DosGetModHandle(PSZ pszModName, PHMODULE phMod);
 USHORT APIENTRY DosGetModName(HMODULE hmod, USHORT cbBuf, PCHAR pchBuf);
 
+/* Resources: os2rc.py binds them, each one a segment of the program. */
+#define RT_POINTER      1   /* also icons */
+#define RT_BITMAP       2
+#define RT_MENU         3
+#define RT_DIALOG       4   /* DLGTEMPLATE */
+#define RT_STRING       5   /* sixteen strings: id / 16 + 1 */
+#define RT_FONTDIR      6
+#define RT_FONT         7
+#define RT_ACCELTABLE   8
+#define RT_RCDATA       9
+#define RT_MESSAGE      10
+#define RT_DLGINCLUDE   11
+#define RT_VKEYTBL      12
+#define RT_KEYTBL       13
+#define RT_CHARTBL      14
+#define RT_DISPLAYINFO  15
+#define RT_FKASHORT     16
+#define RT_FKALONG      17
+#define RT_HELPTABLE    18
+#define RT_HELPSUBTABLE 19
+/* The resource's selector; DosGetResource2 and DosFreeResource are OS/2 1.2. */
+USHORT APIENTRY DosGetResource(HMODULE hmod, USHORT idType, USHORT idName, PSEL psel);
+USHORT APIENTRY DosGetResource2(HMODULE hmod, USHORT idType, USHORT idName,
+                                PVOID FAR *ppData);
+USHORT APIENTRY DosFreeResource(PVOID pData);
+
 /* Semaphores */
 #define SEM_INDEFINITE_WAIT (-1L)
 #define SEM_IMMEDIATE_RETURN 0L

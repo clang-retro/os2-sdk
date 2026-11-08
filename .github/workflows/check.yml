@@ -29,3 +29,4 @@ jobs:
       - run: |
           python3 tools/os2rc.py -I include/os2v2 -r examples/pmnotes.rc "$RUNNER_TEMP/pmnotes.res"
           python3 tools/os2rc.py -I include/os2v2 -r tests/restest.rc "$RUNNER_TEMP/restest.res"
+          python3 tools/os2rc.py -16 -r tests/restest.rc "$RUNNER_TEMP/restest16.res"
