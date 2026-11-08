@@ -1,6 +1,6 @@
 # Check the OS/2 headers: every declared function has an import in
 # lib/os2-*.lnk, and the headers compile (with the host's clang) with the
-# structure sizes the system expects.
+# structure sizes the system expects. And os2rc.py compiles the .rc files.
 name: Check
 
 on:
@@ -21,3 +21,7 @@ jobs:
           persist-credentials: false
       - run: python3 tools/check-headers.py
       - run: tools/check-syntax.sh clang
+      # The resource compiler compiles the example and test resources.
+      - run: |
+          python3 tools/os2rc.py -I include/os2v2 -r examples/pmnotes.rc "$RUNNER_TEMP/pmnotes.res"
+          python3 tools/os2rc.py -I include/os2v2 -r tests/restest.rc "$RUNNER_TEMP/restest.res"

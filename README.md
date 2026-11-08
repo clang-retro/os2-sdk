@@ -24,9 +24,14 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
   extended attributes, large files, memory, threads, semaphores and
   timers, queues, named pipes, sessions, exception handlers, modules and
   resources, national language support, messages, file systems and device
-  IOCTLs), the error codes, and a part of the Presentation Manager
-  (windows, messages, painting, message boxes). `APIENTRY` is the C
-  convention, which is what OS/2's `_System` is.
+  IOCTLs), the error codes, and the Presentation Manager: windows and
+  messages, frames, menus, dialogs, accelerators, the standard controls
+  (buttons, entry fields, list boxes, combo boxes, scroll bars, MLEs, spin
+  buttons), the clipboard, pointers and cursors (`pmwin.h`); presentation
+  spaces, colors, lines, areas, paths, fonts and bitmaps (`pmgpi.h`); the
+  window list and profiles (`pmshl.h`); and the file dialog
+  (`pmstddlg.h`). `APIENTRY` is the C convention, which is what OS/2's
+  `_System` is.
 - `lib/os2-16.lnk`, `lib/os2-32.lnk`: `import` directives for every entry
   point of the OS/2 system DLLs (DOSCALLS, VIOCALLS, KBDCALLS, MOUCALLS,
   MSG, NLS, PMWIN, PMGPI and the rest). The driver gives them to the
@@ -36,14 +41,16 @@ clang --target=i8086-pc-os2 -mcmodel=large -Os app.c -o app.exe   # 16-bit, larg
 - `tools/`: `gen-imports.py` (above), `check-headers.py`, which checks that
   every function the headers declare has an import, and `check-syntax.sh`,
   which compiles `tests/headers.c` against both sets of headers and checks
-  the sizes of the structures. CI runs both.
+  the sizes of the structures. CI runs both. `os2rc.py` is a resource
+  compiler (see below).
 - `build-sysroot.sh`: builds picolibc with its OS/2 layer, the compiler-rt
   builtins, and installs the headers and import lists:
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
   `build-sysroot.sh 16 i8086-msdos` adds the 16-bit libraries to the DOS
   sysroot, in `lib/os2/<model>`.
-- `examples/`: `hello.c` and `sysinfo.c` (both 16 and 32-bit) and
-  `pmhello.c` (a PM window, 32-bit).
+- `examples/`: `hello.c` and `sysinfo.c` (both 16 and 32-bit), and two
+  32-bit PM programs: `pmhello.c` (a window) and `pmnotes.c` (a menu,
+  accelerators, dialogs and strings, from `pmnotes.rc`).
 
 ## How programs are built
 
@@ -64,9 +71,28 @@ far. The heap is the rest of DGROUP, grown to 64 KiB with `DosReallocSeg`,
 in the small and medium models, and a 64 KiB segment from `DosAllocSeg` in
 the compact and large ones.
 
+**Resources.** `tools/os2rc.py` compiles a `.rc` file in the OS/2
+toolkits' resource language (STRINGTABLE, MENU, ACCELTABLE, DLGTEMPLATE
+with DIALOG, FRAME, WINDOW, CONTROL and the predefined controls, RCDATA,
+ICON, POINTER, BITMAP, FONT and user types, with `#include` and `#define`
+from the headers) and binds the resources into a 32-bit program, as one
+more object of the LX file:
+
+```sh
+clang --target=i386-pc-os2 -mwindows -Os pmnotes.c -o pmnotes.exe
+python3 tools/os2rc.py -I include/os2v2 examples/pmnotes.rc pmnotes.exe
+python3 tools/os2rc.py -l pmnotes.exe     # list the resources
+```
+
+`-r` compiles to a `.res` file only, which a later run binds. 16-bit (NE)
+programs can't have resources bound yet.
+
 The C library is picolibc with an OS/2 layer (`libos/os2`): a file
 descriptor is the OS/2 file handle, and `\n` is written as `\r\n` to the
-console and other devices. Files are binary.
+console and other devices. Files are binary. Directories are read with
+`opendir` and `readdir` (`DosFindFirst`); `getcwd`, `chdir`, `getpid` and
+`getppid` work too. `chdir` sets the current directory of a drive but does
+not change the current drive.
 
 ## Testing
 
@@ -75,12 +101,17 @@ programs from a diskette in drive B: (see `tests/README.md`). The 16-bit
 examples pass in all four memory models, and the 32-bit ones pass too.
 `tests/dosapi.c` exercises the 32-bit Dos calls (exception handlers,
 semaphores, queues, named pipes, timers, NLS, file systems, messages and
-extended attributes), and passes on Warp 3.
+extended attributes), `tests/restest.c` reads back the resources
+`os2rc.py` bound into it with `DosGetResource`, and `tests/posix.c` tries
+the directory calls of the C library; all pass on Warp 3. Warp 3's boot
+diskettes have no Presentation Manager, so PM programs are only built.
 
 ## Not yet
 
 - 16-bit DLLs, and 16-bit Presentation Manager headers.
 - From 32-bit code, the 16-bit Vio, Kbd and Mou calls (they need thunks).
+- Resources in 16-bit programs.
+- `system`, `spawn` and `exec` in the C library.
 - C++ (libc++), threads in the C library.
 
 ## License

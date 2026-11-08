@@ -3,8 +3,12 @@
  * (i386-pc-os2).
  *
  * Everything here is declared whatever INCL_ macros are defined: the Dos
- * calls (bsedos.h), the error codes (bseerr.h) and, unless INCL_NOPMAPI
- * is defined, a part of the Presentation Manager (pmwin.h).
+ * calls (bsedos.h, with exceptions in bsexcpt.h), the error codes
+ * (bseerr.h) and, unless INCL_NOPMAPI is defined, the Presentation
+ * Manager: windows, menus, dialogs and controls (pmwin.h), graphics
+ * (pmgpi.h), the switch list and profiles (pmshl.h) and the file dialog
+ * (pmstddlg.h). The DosDevIOCtl constants are in bsedev.h, which os2.h
+ * does not include.
  *
  * The 16-bit video, keyboard and mouse calls (Vio, Kbd, Mou) of OS/2 2.x
  * need 16-bit thunks, which this SDK does not have yet.
@@ -21,6 +25,9 @@
 #include <bseerr.h>
 #ifndef INCL_NOPMAPI
 #include <pmwin.h>
+#include <pmgpi.h>
+#include <pmshl.h>
+#include <pmstddlg.h>
 #endif
 
 #endif /* __OS2_H */
