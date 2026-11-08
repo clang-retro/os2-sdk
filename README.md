@@ -21,8 +21,14 @@ clang --target=i8086-pc-os2 -Os app.c -Wl,@mylib.lnk -o app.exe   # a program th
 ## What's here
 
 - `include/os21x/`: the 16-bit OS/2 1.x API (`os2.h`): types, the Dos
-  calls, Vio, Kbd and Mou, and the error codes. Every function is
-  `__far __pascal` with far pointers, as in the IBM and Microsoft toolkits.
+  calls, Vio, Kbd and Mou, the error codes, and the OS/2 1.x Presentation
+  Manager: windows, messages, frames, menus, dialogs, the controls, the
+  clipboard and pointers (`pmwin.h`), presentation spaces, fonts and
+  bitmaps (`pmgpi.h`), and the switch list and profiles (`pmshl.h`). Every
+  function is `__far __pascal` with far pointers, as in the IBM and
+  Microsoft toolkits. A 1.x message is a `USHORT` and its coordinates are
+  `SHORT`, and the structures are the 1.x ones (`QMSG` is 26 bytes,
+  bitmaps use `BITMAPINFOHEADER`), which `tests/headers.c` checks.
 - `include/os2v2/`: the 32-bit API (`os2.h`): the Dos calls (files and
   extended attributes, large files, memory, threads, semaphores and
   timers, queues, named pipes, sessions, exception handlers, modules and
@@ -56,8 +62,8 @@ clang --target=i8086-pc-os2 -Os app.c -Wl,@mylib.lnk -o app.exe   # a program th
   `build-sysroot.sh 32 i386-os2` makes the 32-bit sysroot, and
   `build-sysroot.sh 16 i8086-msdos` adds the 16-bit libraries to the DOS
   sysroot, in `lib/os2/<model>` (and `lib/os2/<model>/dll`, below).
-- `examples/`: `hello.c` and `sysinfo.c` (both 16 and 32-bit), and two
-  32-bit PM programs: `pmhello.c` (a window) and `pmnotes.c` (a menu,
+- `examples/`: `hello.c`, `sysinfo.c` and the PM window `pmhello.c` (all
+  16 and 32-bit), and the 32-bit PM program `pmnotes.c` (a menu,
   accelerators, dialogs and strings, from `pmnotes.rc`).
 
 ## How programs are built
@@ -149,7 +155,6 @@ diskettes have no Presentation Manager, so PM programs are only built.
 
 ## Not yet
 
-- 16-bit Presentation Manager headers.
 - Threads calling into a 16-bit DLL at once: the C library is built for
   one thread.
 - The rarer Vio, Kbd and Mou calls from 32-bit code: `bsesub.h` has 39

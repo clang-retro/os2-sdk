@@ -1,10 +1,19 @@
-/* A Presentation Manager window for 32-bit OS/2:
+/* A Presentation Manager window, for 32-bit OS/2 and for 16-bit OS/2 1.1
+ * and later:
  *   clang --target=i386-pc-os2 -mwindows -Os pmhello.c -o pmhello.exe
+ *   clang --target=i8086-pc-os2 -mwindows -Os pmhello.c -o pmhello.exe
  */
 #include <os2.h>
 
+/* Messages are 32 bits on 32-bit OS/2 and 16 on OS/2 1.x. */
+#ifdef __32BIT__
+typedef ULONG MSGID;
+#else
+typedef USHORT MSGID;
+#endif
+
 static MRESULT EXPENTRY
-client_proc(HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2)
+client_proc(HWND hwnd, MSGID msg, MPARAM mp1, MPARAM mp2)
 {
     switch (msg) {
     case WM_PAINT: {
@@ -37,7 +46,7 @@ main(void)
 
     WinRegisterClass(hab, "PmHello", client_proc, CS_SIZEREDRAW, 0);
     HWND frame = WinCreateStdWindow(HWND_DESKTOP, WS_VISIBLE, &flags, "PmHello",
-                                    "Hello from clang", 0, NULLHANDLE, 0, &client);
+                                    "Hello from clang", 0, 0, 0, &client);
     while (WinGetMsg(hab, &qmsg, NULLHANDLE, 0, 0))
         WinDispatchMsg(hab, &qmsg);
     WinDestroyWindow(frame);

@@ -93,12 +93,63 @@ typedef HSEM FAR       *PHSEM;
 #define LOUSHORT(l)       ((USHORT)(ULONG)(l))
 #define HIUSHORT(l)       ((USHORT)((ULONG)(l) >> 16))
 
+/* The Presentation Manager (OS/2 1.1 and later). */
+typedef LHANDLE HAB, FAR *PHAB;
+typedef LHANDLE HMQ, FAR *PHMQ;
+typedef LHANDLE HWND, FAR *PHWND;
+typedef LHANDLE HPS, FAR *PHPS;
+typedef LHANDLE HDC, FAR *PHDC;
+typedef LHANDLE HPOINTER, HBITMAP, HMF, HRGN, HACCEL, HSWITCH, HHEAP, HATOMTBL;
+typedef VOID FAR *MPARAM;
+typedef MPARAM FAR *PMPARAM;
+typedef VOID FAR *MRESULT;
+typedef MRESULT FAR *PMRESULT;
+typedef LONG COLOR, FAR *PCOLOR;
+typedef ULONG ERRORID;
+#define NULLHANDLE ((LHANDLE)0)
+typedef USHORT ATOM;
+
+/* Message parameters and results, which are 32 bits. */
+#define MPVOID               ((MPARAM)0L)
+#define MPFROMP(p)           ((MPARAM)(VOID FAR *)(p))
+#define MPFROMHWND(hwnd)     ((MPARAM)(HWND)(hwnd))
+#define MPFROMCHAR(ch)       ((MPARAM)(ULONG)(USHORT)(ch))
+#define MPFROMSHORT(s)       ((MPARAM)(ULONG)(USHORT)(s))
+#define MPFROM2SHORT(s1, s2) ((MPARAM)MAKEULONG(s1, s2))
+#define MPFROMSH2CH(s, uch1, uch2) ((MPARAM)MAKEULONG(s, MAKEUSHORT(uch1, uch2)))
+#define MPFROMLONG(l)        ((MPARAM)(ULONG)(l))
+#define PVOIDFROMMP(mp)      ((VOID FAR *)(mp))
+#define HWNDFROMMP(mp)       ((HWND)(mp))
+#define CHAR1FROMMP(mp)      ((UCHAR)(ULONG)(mp))
+#define CHAR2FROMMP(mp)      ((UCHAR)((ULONG)(mp) >> 8))
+#define CHAR3FROMMP(mp)      ((UCHAR)((ULONG)(mp) >> 16))
+#define CHAR4FROMMP(mp)      ((UCHAR)((ULONG)(mp) >> 24))
+#define SHORT1FROMMP(mp)     ((USHORT)(ULONG)(mp))
+#define SHORT2FROMMP(mp)     ((USHORT)((ULONG)(mp) >> 16))
+#define LONGFROMMP(mp)       ((ULONG)(mp))
+#define MRFROMP(p)           ((MRESULT)(VOID FAR *)(p))
+#define MRFROMSHORT(s)       ((MRESULT)(ULONG)(USHORT)(s))
+#define MRFROM2SHORT(s1, s2) ((MRESULT)MAKEULONG(s1, s2))
+#define MRFROMLONG(l)        ((MRESULT)(ULONG)(l))
+#define PVOIDFROMMR(mr)      ((VOID FAR *)(mr))
+#define LONGFROMMR(mr)       ((ULONG)(mr))
+#define SHORT1FROMMR(mr)     ((USHORT)((ULONG)(mr)))
+#define SHORT2FROMMR(mr)     ((USHORT)((ULONG)(mr) >> 16))
+
 typedef struct _POINTL {
     LONG x, y;
 } POINTL, FAR *PPOINTL;
+typedef struct _POINTS {
+    SHORT x, y;
+} POINTS, FAR *PPOINTS;
 typedef struct _RECTL {
     LONG xLeft, yBottom, xRight, yTop;
 } RECTL, FAR *PRECTL;
+typedef struct _SIZEL {
+    LONG cx, cy;
+} SIZEL, FAR *PSIZEL;
+typedef CHAR STR8[8];
+typedef STR8 FAR *PSTR8;
 
 typedef struct _RESULTCODES {
     USHORT codeTerminate;

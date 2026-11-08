@@ -7,10 +7,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 #include <os2.h>
+
+#define SIZE(t, n) _Static_assert(sizeof(t) == (n), "sizeof(" #t ")")
 #ifdef __32BIT__
 #include <bsedev.h>
 
-#define SIZE(t, n) _Static_assert(sizeof(t) == (n), "sizeof(" #t ")")
 SIZE(CONTEXTRECORD, 176);
 SIZE(EXCEPTIONREPORTRECORD, 36);
 SIZE(EXCEPTIONREGISTRATIONRECORD, 8);
@@ -37,6 +38,21 @@ SIZE(SWCNTRL, 96);
 SIZE(VIOMODEINFO, 14); /* the 16-bit structures of bsesub.h */
 SIZE(KBDKEYINFO, 10);
 SIZE(MOUEVENTINFO, 10);
+#elif defined(_M_I86)
+/* The 16-bit Presentation Manager (only with clang-retro's i8086 target:
+ * check-syntax.sh's i386 stand-in aligns LONG to 4 bytes). */
+SIZE(QMSG, 26);
+SIZE(SWP, 18);
+SIZE(CLASSINFO, 10);
+SIZE(CREATESTRUCT, 42);
+SIZE(MENUITEM, 16);
+SIZE(ACCEL, 6);
+SIZE(DLGTITEM, 30);
+SIZE(FRAMECDATA, 10);
+SIZE(FATTRS, 56);
+SIZE(FONTMETRICS, 208);
+SIZE(BITMAPINFOHEADER, 12);
+SIZE(SWCNTRL, 80);
 #endif
 
 int main(void) { return 0; }
