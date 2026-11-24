@@ -65,6 +65,8 @@ clang --target=i8086-pc-os2 -Os app.c -Wl,@mylib.lnk -o app.exe   # a program th
 - `build-libcxx.sh`: builds libc++ and libc++abi for 32-bit OS/2, with
   exceptions, RTTI and threads, into the `i386-os2` sysroot, and the
   unwinder `runtime/unwind-sjlj.c` as `libunwind.a`.
+- `build-libstdcxx.sh`: adds GCC's libstdc++ to the `i386-os2` sysroot,
+  next to libc++ (see below).
 - `examples/`: `hello.c`, `sysinfo.c` and the PM window `pmhello.c` (all
   16 and 32-bit), and the 32-bit PM program `pmnotes.c` (a menu,
   accelerators, dialogs and strings, from `pmnotes.rc`).
@@ -174,6 +176,11 @@ program keeps no tables for a table-driven unwinder), one chain per
 thread. `std::thread`, `std::mutex`, `std::condition_variable`,
 `thread_local` and `steady_clock` work. The terminate message does not
 demangle names, which keeps programs smaller.
+
+GCC's libstdc++ (15.2.0, compiled by clang) is the other C++ library.
+`build-libstdcxx.sh` adds it, and `-stdlib=libstdc++` selects it.
+[docs/libstdcxx.md](docs/libstdcxx.md) tells how it is built and what it
+has.
 
 ## Testing
 
