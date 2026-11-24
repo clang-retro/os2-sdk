@@ -169,6 +169,22 @@ _Unwind_Ptr _Unwind_GetRegionStart(struct _Unwind_Context *context) {
   return 0;
 }
 
+/* Gives the base for DW_EH_PE_textrel pointers in the LSDA. clang does not
+   use this encoding, thus the base is 0. libstdc++'s personality routine
+   refers to it. */
+_Unwind_Ptr _Unwind_GetTextRelBase(struct _Unwind_Context *context) {
+  (void)context;
+  return 0;
+}
+
+/* Gives the base for DW_EH_PE_datarel pointers in the LSDA. clang does not
+   use this encoding, thus the base is 0. libstdc++'s personality routine
+   refers to it. */
+_Unwind_Ptr _Unwind_GetDataRelBase(struct _Unwind_Context *context) {
+  (void)context;
+  return 0;
+}
+
 _Unwind_Word _Unwind_GetCFA(struct _Unwind_Context *context) {
   return context ? (_Unwind_Word)to_fc(context)->jbuf[2] : 0;
 }

@@ -22,6 +22,12 @@ DLLs (LIBPATH starts with `.`). The 16-bit DLL test, in each memory model:
     clang --target=i8086-pc-os2 -mcmodel=small dllapp.c -Wl,@testdll.lnk -o DLLAPP.EXE
     ./runtests.sh work 60 DLLAPP.EXE TESTDLL.DLL
 
+The C++ test with each C++ library:
+
+    clang++ --target=i386-pc-os2 -O2 cxx.cpp -o CXX.EXE
+    clang++ --target=i386-pc-os2 -stdlib=libstdc++ -O2 cxx.cpp -o CXXGNU.EXE
+    ./runtests.sh work 60 CXX.EXE CXXGNU.EXE
+
 Needs qemu-system-i386, mtools and python3. The last screen is saved as
 work/screen.ppm.
 

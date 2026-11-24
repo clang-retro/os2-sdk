@@ -25,6 +25,7 @@ nav:
   - "What's here": contents.md
   - "How programs are built": building.md
   - "Threads and C++": threads.md
+  - "libstdc++": libstdcxx.md
   - "Testing": testing.md
   - "Not yet": status.md
   - "Contributing": contributing.md
